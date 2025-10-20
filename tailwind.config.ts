@@ -13,6 +13,22 @@ export default {
       },
     },
     extend: {
+      fontSize: {
+        'xs': '12px',
+        'sm': '13px',
+        'base': '14px',
+        'lg': '15px',
+        'xl': '16px',
+        '2xl': '18px',
+        '3xl': '20px',
+        '4xl': '22px',
+        '5xl': '24px',
+        '6xl': '28px',
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
