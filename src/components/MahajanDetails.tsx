@@ -96,6 +96,16 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
     if (user && bills.length > 0) fetchTransactions();
   }, [user, bills]);
 
+  // Listen for refresh events (when bills/transactions are edited)
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchBills();
+    };
+
+    window.addEventListener('refresh-mahajans', handleRefresh);
+    return () => window.removeEventListener('refresh-mahajans', handleRefresh);
+  }, [user, mahajan.id]);
+
   const fetchBills = async () => {
     try {
       const { data, error } = await supabase
