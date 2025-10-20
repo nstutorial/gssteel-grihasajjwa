@@ -152,7 +152,8 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
     const billTransactions = transactions.filter(t => t.bill_id === billId);
     const totalPaid = billTransactions.reduce((sum, t) => sum + t.amount, 0);
     const bill = bills.find(b => b.id === billId);
-    return bill ? bill.bill_amount - totalPaid : 0;
+    const balance = bill ? bill.bill_amount - totalPaid : 0;
+    return Math.max(0, balance); // Prevent negative balances
   };
 
   const calculateInterest = (bill: Bill, balance: number) => {
