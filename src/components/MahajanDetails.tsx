@@ -98,8 +98,9 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
   // Listen for refresh events (when bills/transactions are edited)
   useEffect(() => {
-    const handleRefresh = () => {
-      fetchBills();
+    const handleRefresh = async () => {
+      await fetchBills();
+      await fetchTransactions();
     };
 
     window.addEventListener('refresh-mahajans', handleRefresh);
