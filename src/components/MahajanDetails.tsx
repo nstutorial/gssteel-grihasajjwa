@@ -54,7 +54,7 @@ interface BillTransaction {
   amount: number;
   payment_date: string;
   transaction_type: string;
-  payment_mode: 'cash' | 'bank';
+  payment_mode: string;
   notes: string | null;
   bill: {
     description: string | null;
@@ -395,11 +395,11 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         </TabsContent>
 
         <TabsContent value="searchBill">
-          <SearchBillbyRef bills={bills} />
+          <SearchBillbyRef bills={bills as any} />
         </TabsContent>
 
         <TabsContent value="searchTransaction">
-          <SearchTransactionById transactions={transactions} />
+          <SearchTransactionById transactions={transactions as any} />
         </TabsContent>
       </Tabs>
 

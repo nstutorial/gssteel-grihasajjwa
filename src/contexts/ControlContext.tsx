@@ -83,6 +83,8 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
             allowAddPayment: true,
             allowPaymentManager: true,
             allowRecordPayment: true,
+            allowBillManagement: true,
+            allowMahajanDeletion: true,
           });
         } else {
           throw error;
@@ -117,6 +119,8 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
           allowAddPayment: true,
           allowPaymentManager: true,
           allowRecordPayment: true,
+          allowBillManagement: true,
+          allowMahajanDeletion: true,
         });
       }
       
@@ -132,6 +136,8 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
         allowAddPayment: true,
         allowPaymentManager: true,
         allowRecordPayment: true,
+        allowBillManagement: true,
+        allowMahajanDeletion: true,
       });
     } finally {
       setLoading(false);

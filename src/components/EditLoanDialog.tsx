@@ -99,11 +99,10 @@ const EditLoanDialog: React.FC<EditLoanDialogProps> = ({
     }
   };
 
-  const calculateLoanBalance = (loanId: string) => {
+  const calculateLoanBalance = (loanId: string, currentLoan: any) => {
     const loanTransactions = transactions.filter(t => t.loan_id === loanId);
     const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const loan = loan; // Use the current loan
-    return loan ? loan.principal_amount - totalPaid : 0;
+    return currentLoan ? currentLoan.principal_amount - totalPaid : 0;
   };
 
   const calculateInterest = (loan: any, balance: number) => {
@@ -134,7 +133,7 @@ const EditLoanDialog: React.FC<EditLoanDialogProps> = ({
     if (!user || !loan) return;
     
     // Check if loan is closed (outstanding balance <= 0)
-    const balance = calculateLoanBalance(loan.id);
+    const balance = calculateLoanBalance(loan.id, loan);
     const interest = calculateInterest(loan, balance);
     const outstanding = balance + interest;
     const isClosed = outstanding <= 0;
@@ -197,7 +196,7 @@ const EditLoanDialog: React.FC<EditLoanDialogProps> = ({
     if (!user || !loan) return;
     
     // Check if loan is closed (outstanding balance <= 0)
-    const balance = calculateLoanBalance(loan.id);
+    const balance = calculateLoanBalance(loan.id, loan);
     const interest = calculateInterest(loan, balance);
     const outstanding = balance + interest;
     const isClosed = outstanding <= 0;

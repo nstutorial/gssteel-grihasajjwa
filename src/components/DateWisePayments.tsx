@@ -16,7 +16,7 @@ interface LoanTransaction {
   amount: number;
   payment_date: string;
   transaction_type: string;
-  payment_mode: 'cash' | 'bank';
+  payment_mode: string;
   notes: string | null;
   loan: {
     loan_number: string;

@@ -265,6 +265,8 @@ const Settings = () => {
           allowPaymentManager: true,
           allowRecordPayment: true,
           allowEmailChange: true,
+          allowBillManagement: true,
+          allowMahajanDeletion: true,
         });
         } else {
           toast({

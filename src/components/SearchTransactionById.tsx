@@ -13,7 +13,7 @@ interface Transaction {
   amount: number;
   transaction_type: 'principal' | 'interest' | 'mixed';
   payment_date: string;
-  payment_mode: string; // Should match your enum 'payment_method'
+  payment_mode: 'bank' | 'cash';
   notes?: string;
 }
 
@@ -226,13 +226,16 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
 
               <div>
                 <Label>Payment Mode</Label>
-                <Input
-                  type="text"
+                <select
+                  className="border rounded-md px-2 py-1 w-full"
                   value={editTransaction.payment_mode}
                   onChange={(e) =>
-                    setEditTransaction({ ...editTransaction, payment_mode: e.target.value })
+                    setEditTransaction({ ...editTransaction, payment_mode: e.target.value as 'cash' | 'bank' })
                   }
-                />
+                >
+                  <option value="cash">Cash</option>
+                  <option value="bank">Bank</option>
+                </select>
               </div>
 
               <div>
