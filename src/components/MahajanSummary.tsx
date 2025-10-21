@@ -13,8 +13,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, Download, Filter, RefreshCw } from 'lucide-react';
+import { Calendar, Download, Filter, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface MahajanSummaryData {
   mahajan_id: string;
@@ -30,6 +31,28 @@ interface MahajanSummaryData {
   payment_frequency: number;
 }
 
+interface BillDetail {
+  id: string;
+  bill_number: string;
+  bill_amount: number;
+  bill_date: string;
+  due_date: string | null;
+  is_active: boolean;
+  description: string | null;
+  interest_rate: number;
+  interest_type: string;
+}
+
+interface TransactionDetail {
+  id: string;
+  amount: number;
+  payment_date: string;
+  payment_mode: string;
+  transaction_type: string;
+  notes: string | null;
+  bill_number: string;
+}
+
 const MahajanSummary: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -39,6 +62,12 @@ const MahajanSummary: React.FC = () => {
   const [billStatusFilter, setBillStatusFilter] = useState<'all' | 'active' | 'closed'>('all');
   const [summaryData, setSummaryData] = useState<MahajanSummaryData[]>([]);
   const [cache, setCache] = useState<Map<string, MahajanSummaryData[]>>(new Map());
+  const [expandedMahajan, setExpandedMahajan] = useState<string | null>(null);
+  const [mahajanDetails, setMahajanDetails] = useState<{
+    bills: BillDetail[];
+    transactions: TransactionDetail[];
+  } | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -191,6 +220,74 @@ const MahajanSummary: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-IN');
+  };
+
+  const fetchMahajanDetails = async (mahajanId: string) => {
+    if (!user) return;
+
+    setDetailsLoading(true);
+    try {
+      // Fetch bills
+      const { data: billsData, error: billsError } = await supabase
+        .from('bills')
+        .select('*')
+        .eq('mahajan_id', mahajanId)
+        .eq('user_id', user.id)
+        .order('bill_date', { ascending: false });
+
+      if (billsError) throw billsError;
+
+      let transactionsData: TransactionDetail[] = [];
+
+      // Fetch transactions if there are bills
+      if (billsData && billsData.length > 0) {
+        const billIds = billsData.map(b => b.id);
+        const { data: transData, error: transError } = await supabase
+          .from('bill_transactions')
+          .select(`
+            *,
+            bill:bills(bill_number)
+          `)
+          .in('bill_id', billIds)
+          .order('payment_date', { ascending: false });
+
+        if (transError) throw transError;
+
+        transactionsData = (transData || []).map((trans: any) => ({
+          id: trans.id,
+          amount: trans.amount,
+          payment_date: trans.payment_date,
+          payment_mode: trans.payment_mode,
+          transaction_type: trans.transaction_type,
+          notes: trans.notes,
+          bill_number: trans.bill?.bill_number || 'N/A',
+        }));
+      }
+
+      setMahajanDetails({
+        bills: billsData || [],
+        transactions: transactionsData,
+      });
+    } catch (error) {
+      console.error('Error fetching mahajan details:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to fetch mahajan details',
+      });
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const handleToggleMahajan = async (mahajanId: string) => {
+    if (expandedMahajan === mahajanId) {
+      setExpandedMahajan(null);
+      setMahajanDetails(null);
+    } else {
+      setExpandedMahajan(mahajanId);
+      await fetchMahajanDetails(mahajanId);
+    }
   };
 
   const exportToCSV = () => {
@@ -379,6 +476,7 @@ const MahajanSummary: React.FC = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12"></TableHead>
                     <TableHead>Mahajan</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead className="text-center">Total Bills</TableHead>
@@ -393,28 +491,151 @@ const MahajanSummary: React.FC = () => {
                 </TableHeader>
                 <TableBody>
                   {summaryData.map((mahajan) => (
-                    <TableRow key={mahajan.mahajan_id}>
-                      <TableCell className="font-medium">{mahajan.mahajan_name}</TableCell>
-                      <TableCell>{mahajan.mahajan_phone || '-'}</TableCell>
-                      <TableCell className="text-center">{mahajan.total_bills}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={mahajan.active_bills > 0 ? 'default' : 'secondary'}>
-                          {mahajan.active_bills}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{formatCurrency(mahajan.total_bill_amount)}</TableCell>
-                      <TableCell className="text-right text-green-600">{formatCurrency(mahajan.total_paid_amount)}</TableCell>
-                      <TableCell className="text-right">
-                        <span className={mahajan.outstanding_balance > 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
-                          {formatCurrency(mahajan.outstanding_balance)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {mahajan.last_payment_date ? formatDate(mahajan.last_payment_date) : '-'}
-                      </TableCell>
-                      <TableCell className="text-center">{formatCurrency(mahajan.avg_payment_amount)}</TableCell>
-                      <TableCell className="text-center">{mahajan.payment_frequency}</TableCell>
-                    </TableRow>
+                    <Collapsible
+                      key={mahajan.mahajan_id}
+                      open={expandedMahajan === mahajan.mahajan_id}
+                      onOpenChange={() => handleToggleMahajan(mahajan.mahajan_id)}
+                      asChild
+                    >
+                      <>
+                        <TableRow className="cursor-pointer hover:bg-muted/50">
+                          <TableCell>
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="sm" className="p-0 h-8 w-8">
+                                {expandedMahajan === mahajan.mahajan_id ? (
+                                  <ChevronUp className="h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </CollapsibleTrigger>
+                          </TableCell>
+                          <TableCell className="font-medium">{mahajan.mahajan_name}</TableCell>
+                          <TableCell>{mahajan.mahajan_phone || '-'}</TableCell>
+                          <TableCell className="text-center">{mahajan.total_bills}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={mahajan.active_bills > 0 ? 'default' : 'secondary'}>
+                              {mahajan.active_bills}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{formatCurrency(mahajan.total_bill_amount)}</TableCell>
+                          <TableCell className="text-right text-green-600">{formatCurrency(mahajan.total_paid_amount)}</TableCell>
+                          <TableCell className="text-right">
+                            <span className={mahajan.outstanding_balance > 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
+                              {formatCurrency(mahajan.outstanding_balance)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {mahajan.last_payment_date ? formatDate(mahajan.last_payment_date) : '-'}
+                          </TableCell>
+                          <TableCell className="text-center">{formatCurrency(mahajan.avg_payment_amount)}</TableCell>
+                          <TableCell className="text-center">{mahajan.payment_frequency}</TableCell>
+                        </TableRow>
+                        <CollapsibleContent asChild>
+                          <TableRow>
+                            <TableCell colSpan={11} className="p-0 bg-muted/30">
+                              {detailsLoading ? (
+                                <div className="p-8 text-center">Loading details...</div>
+                              ) : mahajanDetails ? (
+                                <div className="p-4 space-y-6">
+                                  {/* Bills Section */}
+                                  <div>
+                                    <h3 className="font-semibold text-lg mb-3">Bills</h3>
+                                    <div className="overflow-x-auto border rounded-lg">
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow>
+                                            <TableHead>Bill Number</TableHead>
+                                            <TableHead>Bill Date</TableHead>
+                                            <TableHead>Due Date</TableHead>
+                                            <TableHead className="text-right">Amount</TableHead>
+                                            <TableHead>Interest</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Description</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {mahajanDetails.bills.length === 0 ? (
+                                            <TableRow>
+                                              <TableCell colSpan={7} className="text-center text-muted-foreground">
+                                                No bills found
+                                              </TableCell>
+                                            </TableRow>
+                                          ) : (
+                                            mahajanDetails.bills.map((bill) => (
+                                              <TableRow key={bill.id}>
+                                                <TableCell className="font-mono">{bill.bill_number}</TableCell>
+                                                <TableCell>{formatDate(bill.bill_date)}</TableCell>
+                                                <TableCell>{bill.due_date ? formatDate(bill.due_date) : '-'}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(Number(bill.bill_amount))}</TableCell>
+                                                <TableCell>
+                                                  {bill.interest_type === 'none' ? '-' : `${bill.interest_rate}% ${bill.interest_type}`}
+                                                </TableCell>
+                                                <TableCell>
+                                                  <Badge variant={bill.is_active ? 'default' : 'secondary'}>
+                                                    {bill.is_active ? 'Active' : 'Closed'}
+                                                  </Badge>
+                                                </TableCell>
+                                                <TableCell className="max-w-xs truncate">{bill.description || '-'}</TableCell>
+                                              </TableRow>
+                                            ))
+                                          )}
+                                        </TableBody>
+                                      </Table>
+                                    </div>
+                                  </div>
+
+                                  {/* Transactions Section */}
+                                  <div>
+                                    <h3 className="font-semibold text-lg mb-3">Transactions</h3>
+                                    <div className="overflow-x-auto border rounded-lg">
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Bill Number</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead className="text-right">Amount</TableHead>
+                                            <TableHead>Payment Mode</TableHead>
+                                            <TableHead>Notes</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {mahajanDetails.transactions.length === 0 ? (
+                                            <TableRow>
+                                              <TableCell colSpan={6} className="text-center text-muted-foreground">
+                                                No transactions found
+                                              </TableCell>
+                                            </TableRow>
+                                          ) : (
+                                            mahajanDetails.transactions.map((trans) => (
+                                              <TableRow key={trans.id}>
+                                                <TableCell>{formatDate(trans.payment_date)}</TableCell>
+                                                <TableCell className="font-mono">{trans.bill_number}</TableCell>
+                                                <TableCell>
+                                                  <Badge variant={trans.transaction_type === 'payment' ? 'default' : 'secondary'}>
+                                                    {trans.transaction_type}
+                                                  </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right font-medium">
+                                                  {formatCurrency(Number(trans.amount))}
+                                                </TableCell>
+                                                <TableCell className="capitalize">{trans.payment_mode}</TableCell>
+                                                <TableCell className="max-w-xs truncate">{trans.notes || '-'}</TableCell>
+                                              </TableRow>
+                                            ))
+                                          )}
+                                        </TableBody>
+                                      </Table>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </TableCell>
+                          </TableRow>
+                        </CollapsibleContent>
+                      </>
+                    </Collapsible>
                   ))}
                 </TableBody>
               </Table>
