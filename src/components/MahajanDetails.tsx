@@ -152,35 +152,33 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
     const billTransactions = transactions.filter(t => t.bill_id === billId);
     const totalPaid = billTransactions.reduce((sum, t) => sum + t.amount, 0);
     const bill = bills.find(b => b.id === billId);
-    const balance = bill ? bill.bill_amount - totalPaid : 0;
-    return Math.max(0, balance); // Prevent negative balances
+    return bill ? bill.bill_amount - totalPaid : 0;
   };
 
   const calculateInterest = (bill: Bill, balance: number) => {
     if (!bill.interest_rate || bill.interest_type === 'none') return 0;
-
+    
     const rate = bill.interest_rate / 100;
     const startDate = new Date(bill.bill_date);
     const endDate = new Date();
-
-    let interest = 0;
-
+    
     if (bill.interest_type === 'daily') {
-      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
-      interest = balance * rate * (daysDiff / 365);
+      const timeDiff = endDate.getTime() - startDate.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      return balance * rate * (daysDiff / 365);
     } else if (bill.interest_type === 'monthly') {
-      const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+      const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
                      (endDate.getMonth() - startDate.getMonth());
       const daysInMonth = (endDate.getDate() - startDate.getDate()) / 30;
-      interest = balance * rate * (months + daysInMonth);
+      const totalMonths = months + daysInMonth;
+      return balance * rate * totalMonths;
     }
-
-    return Math.round(interest * 100) / 100; // round to 2 decimals
+    
+    return 0;
   };
 
   const calculateTotalOutstanding = () => {
     return bills.reduce((sum, bill) => {
-      if (!bill.is_active) return sum;
       const balance = calculateBillBalance(bill.id);
       const interest = calculateInterest(bill, balance);
       return sum + balance + interest;
