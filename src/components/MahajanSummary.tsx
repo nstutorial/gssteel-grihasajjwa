@@ -152,7 +152,8 @@ const MahajanSummary: React.FC = () => {
             const toDate = new Date(endDate);
             return paymentDate >= fromDate && paymentDate <= toDate;
           }
-          return false;
+          // Include mahajans with no payments (they still have bills to show)
+          return true;
         });
       }
 
