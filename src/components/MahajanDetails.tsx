@@ -86,65 +86,57 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
     payment_mode: 'cash' as 'cash' | 'bank',
   });
 
-  // Fetch bills on mount
+  // Fetch bills and transactions together to prevent flickering
   useEffect(() => {
-    if (user) fetchBills();
+    if (user) fetchBillsAndTransactions();
   }, [user, mahajan.id]);
-
-  // Fetch transactions when bills update
-  useEffect(() => {
-    if (user && bills.length > 0) fetchTransactions();
-  }, [user, bills]);
 
   // Listen for refresh events (when bills/transactions are edited)
   useEffect(() => {
-    const handleRefresh = async () => {
-      await fetchBills();
-      await fetchTransactions();
+    const handleRefresh = () => {
+      fetchBillsAndTransactions();
     };
 
     window.addEventListener('refresh-mahajans', handleRefresh);
     return () => window.removeEventListener('refresh-mahajans', handleRefresh);
   }, [user, mahajan.id]);
 
-  const fetchBills = async () => {
+  const fetchBillsAndTransactions = async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+      const { data: billsData, error: billsError } = await supabase
         .from('bills')
         .select('*')
         .eq('mahajan_id', mahajan.id)
         .eq('user_id', user?.id)
         .order('bill_date', { ascending: false });
 
-      if (error) throw error;
-      setBills(data || []);
-    } catch (error) {
-      console.error('Error fetching bills:', error);
+      if (billsError) throw billsError;
+
+      let transData: any[] = [];
+      if (billsData && billsData.length > 0) {
+        const { data: transactions, error: transError } = await supabase
+          .from('bill_transactions')
+          .select(`*, bill:bills(description, bill_amount)`)
+          .in('bill_id', billsData.map(b => b.id))
+          .order('payment_date', { ascending: false });
+
+        if (transError) throw transError;
+        transData = transactions || [];
+      }
+
+      // Set both states together to prevent flickering
+      setTransactions(transData);
+      setBills(billsData || []);
+    } catch (error: any) {
+      console.error('Error fetching bills and transactions:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to fetch bills',
+        description: 'Failed to fetch bills and transactions',
       });
-    }
-  };
-
-  const fetchTransactions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('bill_transactions')
-        .select(`*, bill:bills(description, bill_amount)`)
-        .in('bill_id', bills.map(b => b.id))
-        .order('payment_date', { ascending: false });
-
-      if (error) throw error;
-      setTransactions(data || []);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to fetch transactions',
-      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -227,7 +219,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
       setShowPaymentDialog(false);
       setSelectedBillId('');
 
-      fetchTransactions();
+      fetchBillsAndTransactions();
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error('Error recording payment:', error);
@@ -498,7 +490,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         onOpenChange={setAddBillDialogOpen}
         mahajan={mahajan}
         onBillAdded={() => {
-          fetchBills();
+          fetchBillsAndTransactions();
           if (onUpdate) onUpdate();
         }}
       />

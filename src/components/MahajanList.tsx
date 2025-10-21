@@ -83,19 +83,23 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setMahajans(data || []);
 
       // Fetch all transactions for calculating outstanding balances
+      let transData: any[] = [];
       if (data && data.length > 0) {
         const billIds = data.flatMap(m => m.bills?.map(b => b.id) || []);
         if (billIds.length > 0) {
-          const { data: transData } = await supabase
+          const { data: transactions } = await supabase
             .from('bill_transactions')
             .select('*')
             .in('bill_id', billIds);
-          setAllTransactions(transData || []);
+          transData = transactions || [];
         }
       }
+
+      // Set both states together to prevent flickering
+      setAllTransactions(transData);
+      setMahajans(data || []);
     } catch (error) {
       console.error('Error fetching mahajans:', error);
       toast({
