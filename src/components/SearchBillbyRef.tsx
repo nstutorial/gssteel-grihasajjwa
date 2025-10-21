@@ -82,6 +82,7 @@ const SearchBillbyRef = ({ bills }: { bills: Bill[] }) => {
           bill_amount: editBill.bill_amount,
           interest_rate: editBill.interest_rate,
           interest_type: editBill.interest_type,
+          bill_date: editBill.bill_date,
           due_date: editBill.due_date,
           description: editBill.description,
           updated_at: new Date().toISOString(),
@@ -253,6 +254,16 @@ const SearchBillbyRef = ({ bills }: { bills: Bill[] }) => {
                   <option value="daily">Daily</option>
                   <option value="monthly">Monthly</option>
                 </select>
+              </div>
+              <div>
+                <Label>Bill Date</Label>
+                <Input
+                  type="date"
+                  value={editBill.bill_date || ''}
+                  onChange={(e) =>
+                    setEditBill({ ...editBill, bill_date: e.target.value })
+                  }
+                />
               </div>
               <div>
                 <Label>Due Date</Label>
