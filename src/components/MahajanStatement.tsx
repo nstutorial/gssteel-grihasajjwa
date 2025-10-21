@@ -96,11 +96,12 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
         .order('bill_date', { ascending: false });
 
       if (billsError) throw billsError;
-      setBills(billsData || []);
+
+      let transactionsData: BillTransaction[] = [];
 
       // Fetch transactions (only if there are bills)
       if (billsData && billsData.length > 0) {
-        const { data: transactionsData, error: transactionsError } = await supabase
+        const { data: transData, error: transactionsError } = await supabase
           .from('bill_transactions')
           .select(`
             *,
@@ -110,10 +111,12 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
           .order('payment_date', { ascending: true });
 
         if (transactionsError) throw transactionsError;
-        setTransactions(transactionsData || []);
-      } else {
-        setTransactions([]);
+        transactionsData = transData || [];
       }
+
+      // Update both states together after all data is fetched
+      setTransactions(transactionsData);
+      setBills(billsData || []);
 
     } catch (error) {
       console.error('Error fetching mahajan data:', error);
