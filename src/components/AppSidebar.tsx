@@ -1,4 +1,5 @@
-import { User, Settings } from 'lucide-react';
+import { User, Settings, Bell } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
   Sidebar,
   SidebarContent,
@@ -21,8 +22,10 @@ interface AppSidebarProps {
 export function AppSidebar({ onSettingsClick, onProfileClick }: AppSidebarProps) {
   const { state } = useSidebar();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const menuItems = [
+    { title: 'Reminders', icon: Bell, onClick: () => navigate('/reminders') },
     { title: 'Profile', icon: User, onClick: onProfileClick },
     { title: 'Settings', icon: Settings, onClick: onSettingsClick },
   ];
