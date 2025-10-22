@@ -194,21 +194,59 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
     if (!selectedLoan) return;
 
     try {
+      const paymentAmount = parseFloat(paymentData.amount);
+      
+      // Calculate current outstanding interest and principal
+      const currentBalance = calculateLoanBalance(selectedLoan.id);
+      const currentInterest = calculateInterest(selectedLoan, currentBalance);
+      
+      // Split payment: interest first, then principal
+      let interestPayment = 0;
+      let principalPayment = 0;
+      
+      if (currentInterest > 0 && paymentAmount > 0) {
+        // Pay interest first
+        interestPayment = Math.min(paymentAmount, currentInterest);
+        // Remaining amount goes to principal
+        principalPayment = paymentAmount - interestPayment;
+      } else {
+        // No interest, all goes to principal
+        principalPayment = paymentAmount;
+      }
+      
+      // Create transaction records
+      const transactions = [];
+      
+      if (interestPayment > 0) {
+        transactions.push({
+          loan_id: selectedLoan.id,
+          amount: interestPayment,
+          transaction_type: 'interest',
+          payment_mode: paymentData.payment_mode,
+          notes: paymentData.notes ? `${paymentData.notes} (Interest portion)` : 'Interest portion',
+        });
+      }
+      
+      if (principalPayment > 0) {
+        transactions.push({
+          loan_id: selectedLoan.id,
+          amount: principalPayment,
+          transaction_type: 'principal',
+          payment_mode: paymentData.payment_mode,
+          notes: paymentData.notes ? `${paymentData.notes} (Principal portion)` : 'Principal portion',
+        });
+      }
+      
+      // Insert all transactions
       const { error } = await supabase
         .from('loan_transactions')
-        .insert({
-          loan_id: selectedLoan.id,
-          amount: parseFloat(paymentData.amount),
-          transaction_type: paymentData.type,
-          payment_mode: paymentData.payment_mode,
-          notes: paymentData.notes || null,
-        });
+        .insert(transactions);
 
       if (error) throw error;
 
       toast({
         title: "Payment recorded",
-        description: "The payment has been successfully recorded.",
+        description: `₹${paymentAmount.toFixed(2)} recorded (Interest: ₹${interestPayment.toFixed(2)}, Principal: ₹${principalPayment.toFixed(2)})`,
       });
 
       setPaymentData({ amount: '', type: 'mixed', notes: '', payment_mode: 'cash' });
