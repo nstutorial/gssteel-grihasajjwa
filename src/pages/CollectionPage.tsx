@@ -593,22 +593,107 @@ const CollectionPage = ({ selectedDay }: CollectionPageProps) => {
     const editedPayment = editingPayments[customerId]?.[paymentId];
     if (!editedPayment) return;
 
+    const newAmount = parseFloat(editedPayment.amount);
+    if (isNaN(newAmount) || newAmount <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Amount",
+        description: "Please enter a valid payment amount greater than 0.",
+      });
+      return;
+    }
+
     try {
-      const { error } = await supabase
+      // Get the original transaction to find the loan
+      const { data: originalTransaction, error: fetchError } = await supabase
         .from('loan_transactions')
-        .update({
-          amount: parseFloat(editedPayment.amount),
-          notes: editedPayment.notes?.trim() || null,
-          transaction_type: editedPayment.transaction_type,
-          payment_mode: editedPayment.payment_mode
-        })
+        .select('*, loan:loans!inner(id, interest_rate, interest_type, loan_date, customer_id)')
+        .eq('id', paymentId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!originalTransaction) {
+        throw new Error('Transaction not found');
+      }
+
+      const loanId = originalTransaction.loan_id;
+      const loan = originalTransaction.loan;
+
+      // Calculate current balance and interest (excluding this payment)
+      const loanTransactions = allTransactions.filter(t => 
+        t.loan_id === loanId && t.id !== paymentId
+      );
+      const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
+      const customer = customers.find(c => c.id === customerId);
+      const loanDetails = customer?.loans?.find(l => l.id === loanId);
+      
+      if (!loanDetails) {
+        throw new Error('Loan not found');
+      }
+
+      const currentBalance = loanDetails.principal_amount - totalPaid;
+      const currentInterest = calculateInterest(loan, currentBalance);
+
+      // Calculate the split: interest first, then principal
+      let interestPayment = 0;
+      let principalPayment = 0;
+
+      if (currentInterest > 0 && newAmount > 0) {
+        interestPayment = Math.min(newAmount, currentInterest);
+        principalPayment = newAmount - interestPayment;
+      } else {
+        principalPayment = newAmount;
+      }
+
+      // Delete the old transaction
+      const { error: deleteError } = await supabase
+        .from('loan_transactions')
+        .delete()
         .eq('id', paymentId);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
+
+      // Insert new transaction(s) with proper split
+      const transactions = [];
+      if (interestPayment > 0) {
+        transactions.push({
+          loan_id: loanId,
+          amount: interestPayment,
+          transaction_type: 'interest',
+          payment_mode: editedPayment.payment_mode,
+          payment_date: originalTransaction.payment_date,
+          notes: editedPayment.notes?.trim() || null,
+        });
+      }
+      if (principalPayment > 0) {
+        transactions.push({
+          loan_id: loanId,
+          amount: principalPayment,
+          transaction_type: 'principal',
+          payment_mode: editedPayment.payment_mode,
+          payment_date: originalTransaction.payment_date,
+          notes: editedPayment.notes?.trim() || null,
+        });
+      }
+
+      const { error: insertError } = await supabase
+        .from('loan_transactions')
+        .insert(transactions);
+
+      if (insertError) throw insertError;
+
+      let description = `Payment updated to ₹${newAmount.toFixed(2)}`;
+      if (interestPayment > 0 && principalPayment > 0) {
+        description += ` (₹${interestPayment.toFixed(2)} interest + ₹${principalPayment.toFixed(2)} principal)`;
+      } else if (interestPayment > 0) {
+        description += ` (interest only)`;
+      } else {
+        description += ` (principal only)`;
+      }
 
       toast({
         title: "Payment Updated",
-        description: "Payment has been successfully updated.",
+        description,
       });
 
       // Refresh data
@@ -1996,9 +2081,9 @@ const CollectionPage = ({ selectedDay }: CollectionPageProps) => {
                                   <div key={index} className="p-3 bg-green-50 rounded border">
                                     {isEditing ? (
                                       <div className="space-y-3">
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-1 gap-2">
                                           <div>
-                                            <Label htmlFor={`edit-amount-${payment.id}`} className="text-xs">Amount</Label>
+                                            <Label htmlFor={`edit-amount-${payment.id}`} className="text-xs">Amount (will auto-split: interest first, then principal)</Label>
                                             <Input
                                               id={`edit-amount-${payment.id}`}
                                               type="number"
@@ -2008,28 +2093,10 @@ const CollectionPage = ({ selectedDay }: CollectionPageProps) => {
                                               className="h-8"
                                             />
                                           </div>
-                                          <div>
-                                            <Label htmlFor={`edit-type-${payment.id}`} className="text-xs">Type</Label>
-                                            <Select
-                                              value={editedPayment.transaction_type}
-                                              onValueChange={(value: 'principal' | 'interest' | 'mixed') => 
-                                                updateEditingPayment(customer.id, payment.id, 'transaction_type', value)
-                                              }
-                                            >
-                                              <SelectTrigger className="h-8">
-                                                <SelectValue />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                <SelectItem value="principal">Principal</SelectItem>
-                                                <SelectItem value="interest">Interest</SelectItem>
-                                                <SelectItem value="mixed">Mixed</SelectItem>
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
                                           <div>
-                                            <Label htmlFor={`edit-mode-${payment.id}`} className="text-xs">Mode</Label>
+                                            <Label htmlFor={`edit-mode-${payment.id}`} className="text-xs">Payment Mode</Label>
                                             <Select
                                               value={editedPayment.payment_mode}
                                               onValueChange={(value: 'cash' | 'bank') => 
