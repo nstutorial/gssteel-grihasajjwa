@@ -8,7 +8,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, CalendarIcon, CheckCircle2, XCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ArrowLeft, CalendarIcon, CheckCircle2, XCircle, Calendar as CalendarEdit } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -24,6 +27,7 @@ interface LoanReminder {
   interest_rate: number;
   interest_type: string;
   amount_due: number;
+  outstanding_balance: number;
   is_collected: boolean;
   collection_date: string | null;
 }
@@ -34,6 +38,9 @@ const Reminders = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [reminders, setReminders] = useState<LoanReminder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dueDateDialog, setDueDateDialog] = useState(false);
+  const [selectedLoanForDueDate, setSelectedLoanForDueDate] = useState<LoanReminder | null>(null);
+  const [newDueDate, setNewDueDate] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -97,12 +104,10 @@ const Reminders = () => {
             totalInterestPaid += parseFloat(tx.amount.toString());
           }
 
-          // Check if payment made on or after due date for this specific due date
-          if (tx.payment_date >= loan.due_date && tx.payment_date <= dateStr) {
+          // Check if payment made on selected date only
+          if (tx.payment_date === dateStr) {
             isCollected = true;
-            if (!collectionDate || tx.payment_date < collectionDate) {
-              collectionDate = tx.payment_date;
-            }
+            collectionDate = tx.payment_date;
           }
         });
 
@@ -120,8 +125,10 @@ const Reminders = () => {
 
         const amountDue = balance + Math.max(0, interest - totalInterestPaid);
 
-        // Only show if there's an outstanding balance
-        if (balance > 0) {
+        // Only show if:
+        // 1. There's an outstanding balance AND it's pending (not collected)
+        // 2. OR it was collected on the selected date (to show today's collections)
+        if (balance > 0 && (!isCollected || (isCollected && collectionDate === dateStr))) {
           remindersData.push({
             id: loan.id,
             loan_number: loan.loan_number || 'N/A',
@@ -132,6 +139,7 @@ const Reminders = () => {
             interest_rate: loan.interest_rate || 0,
             interest_type: loan.interest_type || 'none',
             amount_due: amountDue,
+            outstanding_balance: balance,
             is_collected: isCollected,
             collection_date: collectionDate,
           });
@@ -144,6 +152,28 @@ const Reminders = () => {
       toast.error('Failed to fetch reminders');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSetDueDate = async () => {
+    if (!selectedLoanForDueDate || !newDueDate) return;
+
+    try {
+      const { error } = await supabase
+        .from('loans')
+        .update({ due_date: newDueDate })
+        .eq('id', selectedLoanForDueDate.id);
+
+      if (error) throw error;
+
+      toast.success('Due date updated successfully');
+      setDueDateDialog(false);
+      setSelectedLoanForDueDate(null);
+      setNewDueDate('');
+      fetchReminders();
+    } catch (error: any) {
+      console.error('Error updating due date:', error);
+      toast.error('Failed to update due date');
     }
   };
 
@@ -245,8 +275,10 @@ const Reminders = () => {
                       <TableHead>Due Date</TableHead>
                       <TableHead className="text-right">Principal</TableHead>
                       <TableHead className="text-right">Amount Due</TableHead>
+                      <TableHead className="text-right">Outstanding</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Collection Date</TableHead>
+                      <TableHead>Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -257,6 +289,9 @@ const Reminders = () => {
                         <TableCell>{format(new Date(reminder.due_date), 'PPP')}</TableCell>
                         <TableCell className="text-right">₹{reminder.principal_amount.toFixed(2)}</TableCell>
                         <TableCell className="text-right font-semibold">₹{reminder.amount_due.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-semibold text-orange-600">
+                          ₹{reminder.outstanding_balance.toFixed(2)}
+                        </TableCell>
                         <TableCell>
                           {reminder.is_collected ? (
                             <Badge variant="default" className="bg-green-600">
@@ -272,6 +307,22 @@ const Reminders = () => {
                         </TableCell>
                         <TableCell>
                           {reminder.collection_date ? format(new Date(reminder.collection_date), 'PPP') : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {reminder.outstanding_balance > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedLoanForDueDate(reminder);
+                                setNewDueDate(reminder.due_date);
+                                setDueDateDialog(true);
+                              }}
+                            >
+                              <CalendarEdit className="h-4 w-4 mr-1" />
+                              Set Due Date
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -301,6 +352,37 @@ const Reminders = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Set Due Date Dialog */}
+        <Dialog open={dueDateDialog} onOpenChange={setDueDateDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Set New Due Date</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Customer: {selectedLoanForDueDate?.customer_name}</Label>
+                <Label>Loan #: {selectedLoanForDueDate?.loan_number}</Label>
+                <Label>Outstanding: ₹{selectedLoanForDueDate?.outstanding_balance.toFixed(2)}</Label>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-due-date">New Due Date</Label>
+                <Input
+                  id="new-due-date"
+                  type="date"
+                  value={newDueDate}
+                  onChange={(e) => setNewDueDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDueDateDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSetDueDate}>Update Due Date</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
