@@ -1,4 +1,4 @@
-import { User, Settings, Bell } from 'lucide-react';
+import { User, Settings, Bell, Receipt } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sidebar,
@@ -25,7 +25,8 @@ export function AppSidebar({ onSettingsClick, onProfileClick }: AppSidebarProps)
   const navigate = useNavigate();
 
   const menuItems = [
-    { title: 'Reminders', icon: Bell, onClick: () => navigate('/reminders') },
+    { title: 'Loan Reminders', icon: Bell, onClick: () => navigate('/reminders') },
+    { title: 'Bill Reminders', icon: Receipt, onClick: () => navigate('/bill-reminders') },
     { title: 'Profile', icon: User, onClick: onProfileClick },
     { title: 'Settings', icon: Settings, onClick: onSettingsClick },
   ];

@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import CollectionPage from "./pages/CollectionPage";
 import PasswordManagement from "./pages/PasswordManagement";
 import Reminders from "./pages/Reminders";
+import BillReminders from "./pages/BillReminders";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -100,6 +101,11 @@ const AppRoutes = () => {
       <Route path="/reminders" element={
         <ProtectedRoute>
           <Reminders />
+        </ProtectedRoute>
+      } />
+      <Route path="/bill-reminders" element={
+        <ProtectedRoute>
+          <BillReminders />
         </ProtectedRoute>
       } />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
