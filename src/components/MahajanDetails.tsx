@@ -81,7 +81,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
   const [paymentData, setPaymentData] = useState({
     amount: '',
-    paymentType: 'principal' as 'principal' | 'interest' | 'mixed',
+    payment_date: new Date().toISOString().split('T')[0],
     notes: '',
     payment_mode: 'cash' as 'cash' | 'bank',
   });
@@ -179,10 +179,10 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !selectedBillId) return;
+    if (!user) return;
 
-    const amount = parseFloat(paymentData.amount);
-    if (isNaN(amount) || amount <= 0) {
+    const paymentAmount = parseFloat(paymentData.amount);
+    if (isNaN(paymentAmount) || paymentAmount <= 0) {
       toast({
         variant: 'destructive',
         title: 'Invalid Amount',
@@ -193,31 +193,81 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
     setLoading(true);
     try {
+      // Get all active bills sorted by bill_date (oldest first)
+      const activeBills = bills
+        .filter(b => b.is_active)
+        .sort((a, b) => new Date(a.bill_date).getTime() - new Date(b.bill_date).getTime());
+
+      if (activeBills.length === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'No Active Bills',
+          description: 'There are no active bills to pay',
+        });
+        return;
+      }
+
+      let remainingPayment = paymentAmount;
+      const transactionsToInsert: any[] = [];
+
+      // Process each bill sequentially
+      for (const bill of activeBills) {
+        if (remainingPayment <= 0) break;
+
+        const balance = calculateBillBalance(bill.id);
+        const interest = calculateInterest(bill, balance);
+        const totalBillOutstanding = balance + interest;
+
+        if (totalBillOutstanding <= 0) continue;
+
+        // Pay interest first
+        if (interest > 0 && remainingPayment > 0) {
+          const interestPayment = Math.min(interest, remainingPayment);
+          transactionsToInsert.push({
+            bill_id: bill.id,
+            amount: interestPayment,
+            transaction_type: 'interest',
+            payment_mode: paymentData.payment_mode,
+            payment_date: paymentData.payment_date,
+            notes: paymentData.notes || null,
+          });
+          remainingPayment -= interestPayment;
+        }
+
+        // Then pay principal
+        if (balance > 0 && remainingPayment > 0) {
+          const principalPayment = Math.min(balance, remainingPayment);
+          transactionsToInsert.push({
+            bill_id: bill.id,
+            amount: principalPayment,
+            transaction_type: 'principal',
+            payment_mode: paymentData.payment_mode,
+            payment_date: paymentData.payment_date,
+            notes: paymentData.notes || null,
+          });
+          remainingPayment -= principalPayment;
+        }
+      }
+
+      // Insert all transactions
       const { error } = await supabase
         .from('bill_transactions')
-        .insert({
-          bill_id: selectedBillId,
-          amount,
-          transaction_type: paymentData.paymentType,
-          payment_mode: paymentData.payment_mode,
-          notes: paymentData.notes || null,
-        });
+        .insert(transactionsToInsert);
 
       if (error) throw error;
 
       toast({
         title: 'Payment recorded',
-        description: 'Payment has been successfully recorded',
+        description: `Payment of ${formatCurrency(paymentAmount)} has been distributed across bills`,
       });
 
       setPaymentData({
         amount: '',
-        paymentType: 'principal',
+        payment_date: new Date().toISOString().split('T')[0],
         notes: '',
         payment_mode: 'cash',
       });
       setShowPaymentDialog(false);
-      setSelectedBillId('');
 
       fetchBillsAndTransactions();
       if (onUpdate) onUpdate();
@@ -402,23 +452,17 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
           </DialogHeader>
           <form onSubmit={handlePaymentSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label>Select Bill</Label>
-              <Select value={selectedBillId} onValueChange={setSelectedBillId} required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a bill" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bills.filter(b => b.is_active).map((bill) => (
-                    <SelectItem key={bill.id} value={bill.id}>
-                      {bill.description || 'Bill'} - {formatCurrency(bill.bill_amount)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Total Outstanding</Label>
+              <div className="text-2xl font-bold text-red-600">
+                {formatCurrency(calculateTotalOutstanding())}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Payment will be applied to bills sequentially (oldest first), clearing interest before principal
+              </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount</Label>
+              <Label htmlFor="amount">Payment Amount</Label>
               <Input
                 id="amount"
                 type="number"
@@ -431,22 +475,14 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
             </div>
 
             <div className="space-y-2">
-              <Label>Payment Type</Label>
-              <Select 
-                value={paymentData.paymentType} 
-                onValueChange={(value: 'principal' | 'interest' | 'mixed') => 
-                  setPaymentData({ ...paymentData, paymentType: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="principal">Principal</SelectItem>
-                  <SelectItem value="interest">Interest</SelectItem>
-                  <SelectItem value="mixed">Mixed</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="payment_date">Payment Date</Label>
+              <Input
+                id="payment_date"
+                type="date"
+                value={paymentData.payment_date}
+                onChange={(e) => setPaymentData({ ...paymentData, payment_date: e.target.value })}
+                required
+              />
             </div>
 
             <div className="space-y-2">
