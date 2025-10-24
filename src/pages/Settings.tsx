@@ -324,6 +324,7 @@ const Settings = () => {
           mahajans: true,
           daywise: true,
           payments: true,
+          bill_customers: true,
         };
         
         const defaultControls = {
@@ -594,6 +595,7 @@ const Settings = () => {
       mahajans: true,
       daywise: true,
       payments: true,
+      bill_customers: true,
     };
 
     const defaultControls = {

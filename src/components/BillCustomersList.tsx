@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { AddBillCustomerDialog } from './AddBillCustomerDialog';
 import { EditBillCustomerDialog } from './EditBillCustomerDialog';
+import AddBillDialog from './AddBillDialog';
 import { Plus, Search, Edit, Phone, Mail, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -30,6 +31,7 @@ export function BillCustomersList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addBillDialogOpen, setAddBillDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<BillCustomer | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -79,6 +81,11 @@ export function BillCustomersList() {
   const handleEdit = (customer: BillCustomer) => {
     setSelectedCustomer(customer);
     setEditDialogOpen(true);
+  };
+
+  const handleAddBill = (customer: BillCustomer) => {
+    setSelectedCustomer(customer);
+    setAddBillDialogOpen(true);
   };
 
   return (
@@ -157,13 +164,24 @@ export function BillCustomersList() {
                     </TableCell>
                     {controlSettings.allowEdit && (
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(customer)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddBill(customer)}
+                            title="Add Bill"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(customer)}
+                            title="Edit Customer"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -185,6 +203,13 @@ export function BillCustomersList() {
         onOpenChange={setEditDialogOpen}
         customer={selectedCustomer}
         onCustomerUpdated={fetchCustomers}
+      />
+
+      <AddBillDialog
+        open={addBillDialogOpen}
+        onOpenChange={setAddBillDialogOpen}
+        mahajan={selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name } : null}
+        onBillAdded={fetchCustomers}
       />
     </Card>
   );
