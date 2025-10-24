@@ -17,6 +17,7 @@ export interface TabSettings {
   loans: boolean;
   customers: boolean;
   mahajans: boolean;
+  bill_customers: boolean;
   daywise: boolean;
   payments: boolean;
 }
@@ -45,6 +46,7 @@ const Settings = () => {
     loans: true,
     customers: true,
     mahajans: true,
+    bill_customers: true,
     daywise: true,
     payments: true,
   });

@@ -26,6 +26,7 @@ import DateWisePayments from '@/components/DateWisePayments';
 import MahajanList from '@/components/MahajanList';
 import AddMahajanDialog from '@/components/AddMahajanDialog';
 import MahajanSummary from '@/components/MahajanSummary';
+import { BillCustomersList } from '@/components/BillCustomersList';
 import { TabSettings } from '@/pages/Settings';
 import { useToast } from '@/hooks/use-toast';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -53,6 +54,7 @@ const Dashboard = () => {
     loans: true,
     customers: true,
     mahajans: true,
+    bill_customers: true,
     daywise: true,
     payments: true,
   });
@@ -75,18 +77,20 @@ const Dashboard = () => {
 
       if (data) {
         const settings = data.visible_tabs as unknown as TabSettings;
-        // Ensure mahajans field exists, default to true if missing
-        const settingsWithMahajans = {
+        // Ensure mahajans and bill_customers fields exist, default to true if missing
+        const settingsWithDefaults = {
           ...settings,
-          mahajans: settings.mahajans !== undefined ? settings.mahajans : true
+          mahajans: settings.mahajans !== undefined ? settings.mahajans : true,
+          bill_customers: (settings as any).bill_customers !== undefined ? (settings as any).bill_customers : true
         };
-        setTabSettings(settingsWithMahajans);
+        setTabSettings(settingsWithDefaults);
       } else {
         // If no settings exist, create default settings
         const defaultSettings = {
           loans: true,
           customers: true,
           mahajans: true,
+          bill_customers: true,
           daywise: true,
           payments: true,
         };
@@ -271,6 +275,7 @@ const Dashboard = () => {
                 {tabSettings.loans && <TabsTrigger value="loans" className="text-xs sm:text-sm">Loans</TabsTrigger>}
                 {tabSettings.customers && <TabsTrigger value="customers" className="text-xs sm:text-sm">Customers</TabsTrigger>}
                 {tabSettings.mahajans && <TabsTrigger value="mahajans" className="text-xs sm:text-sm">Mahajans</TabsTrigger>}
+                {tabSettings.bill_customers && <TabsTrigger value="bill_customers" className="text-xs sm:text-sm">Bill Customers</TabsTrigger>}
                 {tabSettings.daywise && <TabsTrigger value="daywise" className="text-xs sm:text-sm">Collection</TabsTrigger>}
                 {tabSettings.payments && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
               </TabsList>
@@ -391,6 +396,14 @@ const Dashboard = () => {
                   }} />
                 </div>
                 <DaywisePayment onUpdate={fetchStats} />
+              </TabsContent>
+            )}
+
+            {tabSettings.bill_customers && (
+              <TabsContent value="bill_customers" className="space-y-4 mt-4">
+                <div className="space-y-4">
+                  <BillCustomersList />
+                </div>
               </TabsContent>
             )}
 

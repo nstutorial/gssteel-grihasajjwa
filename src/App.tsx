@@ -14,6 +14,7 @@ import CollectionPage from "./pages/CollectionPage";
 import PasswordManagement from "./pages/PasswordManagement";
 import Reminders from "./pages/Reminders";
 import BillReminders from "./pages/BillReminders";
+import BillCustomers from "./pages/BillCustomers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

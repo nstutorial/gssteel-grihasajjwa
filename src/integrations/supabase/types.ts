@@ -38,6 +38,45 @@ export type Database = {
         }
         Relationships: []
       }
+      bill_customers: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string | null
+          gst_number: string | null
+          id: string
+          name: string
+          outstanding_amount: number | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          gst_number?: string | null
+          id?: string
+          name: string
+          outstanding_amount?: number | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          gst_number?: string | null
+          id?: string
+          name?: string
+          outstanding_amount?: number | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bill_transactions: {
         Row: {
           amount: number
@@ -411,16 +450,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      generate_bill_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_loan_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_bill_number: { Args: never; Returns: string }
+      generate_loan_number: { Args: never; Returns: string }
       get_all_users_for_admin: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           full_name: string
@@ -428,10 +461,7 @@ export type Database = {
           user_role: string
         }[]
       }
-      get_user_role: {
-        Args: { user_id_param: string }
-        Returns: string
-      }
+      get_user_role: { Args: { user_id_param: string }; Returns: string }
       update_user_email: {
         Args: { new_email_param: string; user_id_param: string }
         Returns: undefined
