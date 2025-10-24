@@ -871,7 +871,10 @@ Generated on: ${new Date().toLocaleDateString()}
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         loan={selectedLoan}
-        onLoanUpdated={onUpdate}
+        onLoanUpdated={() => {
+          fetchLoans();
+          onUpdate();
+        }}
       />
 
       {/* Add Loan Dialog */}
