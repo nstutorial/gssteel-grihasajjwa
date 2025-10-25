@@ -34,7 +34,7 @@ const paymentSchema = z.object({
   sale_id: z.string().min(1, 'Please select a sale'),
   amount: z.string().min(1, 'Amount is required'),
   payment_date: z.string().min(1, 'Payment date is required'),
-  payment_mode: z.enum(['cash', 'online', 'cheque']),
+  payment_mode: z.enum(['cash', 'bank']),
   transaction_type: z.enum(['payment', 'refund']).default('payment'),
   notes: z.string().optional(),
 });
@@ -302,8 +302,7 @@ export function RecordSalePaymentDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="online">Online</SelectItem>
-                      <SelectItem value="cheque">Cheque</SelectItem>
+                      <SelectItem value="bank">Bank</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
