@@ -79,7 +79,11 @@ export function BillCustomersList() {
           .select('*')
           .in('sale_id', saleIds);
         setAllTransactions(transData || []);
+      } else {
+        setAllTransactions([]);
       }
+    } else {
+      setAllTransactions([]);
     }
 
     setCustomers(data || []);
@@ -182,7 +186,7 @@ export function BillCustomersList() {
                   <TableHead>Contact</TableHead>
                   <TableHead>GST Number</TableHead>
                   <TableHead className="text-right">Outstanding</TableHead>
-                  {controlSettings.allowEdit && <TableHead className="text-right">Actions</TableHead>}
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -218,25 +222,26 @@ export function BillCustomersList() {
                       <TableCell className="text-right font-semibold">
                         ₹{outstandingBalance.toFixed(2)}
                       </TableCell>
-                      {controlSettings.allowEdit && (
-                        <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRecordPayment(customer)}
-                              title="Record Payment"
-                            >
-                              <DollarSign className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleAddSale(customer)}
-                              title="Add Sale"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
+
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRecordPayment(customer)}
+                            title="Record Payment"
+                          >
+                            <DollarSign className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddSale(customer)}
+                            title="Add Sale"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                          {controlSettings.allowEdit && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -245,9 +250,9 @@ export function BillCustomersList() {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                          </div>
-                        </TableCell>
-                      )}
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
