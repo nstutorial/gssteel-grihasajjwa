@@ -391,6 +391,103 @@ export type Database = {
         }
         Relationships: []
       }
+      sale_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_mode: Database["public"]["Enums"]["payment_method"]
+          sale_id: string
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_mode: Database["public"]["Enums"]["payment_method"]
+          sale_id: string
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_mode?: Database["public"]["Enums"]["payment_method"]
+          sale_id?: string
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_transactions_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales: {
+        Row: {
+          bill_customer_id: string
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          interest_rate: number | null
+          interest_type: string | null
+          is_active: boolean | null
+          sale_amount: number
+          sale_date: string
+          sale_number: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bill_customer_id: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          interest_rate?: number | null
+          interest_type?: string | null
+          is_active?: boolean | null
+          sale_amount: number
+          sale_date?: string
+          sale_number?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bill_customer_id?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          interest_rate?: number | null
+          interest_type?: string | null
+          is_active?: boolean | null
+          sale_amount?: number
+          sale_date?: string
+          sale_number?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_bill_customer_id_fkey"
+            columns: ["bill_customer_id"]
+            isOneToOne: false
+            referencedRelation: "bill_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settings_access_password: {
         Row: {
           created_at: string
@@ -452,6 +549,7 @@ export type Database = {
     Functions: {
       generate_bill_number: { Args: never; Returns: string }
       generate_loan_number: { Args: never; Returns: string }
+      generate_sale_number: { Args: never; Returns: string }
       get_all_users_for_admin: {
         Args: never
         Returns: {

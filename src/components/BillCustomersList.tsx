@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { AddBillCustomerDialog } from './AddBillCustomerDialog';
 import { EditBillCustomerDialog } from './EditBillCustomerDialog';
-import AddBillDialog from './AddBillDialog';
+import { AddSaleDialog } from './AddSaleDialog';
 import { Plus, Search, Edit, Phone, Mail, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -31,7 +31,7 @@ export function BillCustomersList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [addBillDialogOpen, setAddBillDialogOpen] = useState(false);
+  const [addSaleDialogOpen, setAddSaleDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<BillCustomer | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -83,9 +83,9 @@ export function BillCustomersList() {
     setEditDialogOpen(true);
   };
 
-  const handleAddBill = (customer: BillCustomer) => {
+  const handleAddSale = (customer: BillCustomer) => {
     setSelectedCustomer(customer);
-    setAddBillDialogOpen(true);
+    setAddSaleDialogOpen(true);
   };
 
   return (
@@ -168,8 +168,8 @@ export function BillCustomersList() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleAddBill(customer)}
-                            title="Add Bill"
+                            onClick={() => handleAddSale(customer)}
+                            title="Add Sale"
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
@@ -205,11 +205,11 @@ export function BillCustomersList() {
         onCustomerUpdated={fetchCustomers}
       />
 
-      <AddBillDialog
-        open={addBillDialogOpen}
-        onOpenChange={setAddBillDialogOpen}
-        mahajan={selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name } : null}
-        onBillAdded={fetchCustomers}
+      <AddSaleDialog
+        open={addSaleDialogOpen}
+        onOpenChange={setAddSaleDialogOpen}
+        customer={selectedCustomer}
+        onSaleAdded={fetchCustomers}
       />
     </Card>
   );
