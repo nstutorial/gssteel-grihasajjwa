@@ -31,7 +31,6 @@ import {
 import { toast } from 'sonner';
 
 const paymentSchema = z.object({
-  sale_id: z.string().min(1, 'Please select a sale'),
   amount: z.string().min(1, 'Amount is required'),
   payment_date: z.string().min(1, 'Payment date is required'),
   payment_mode: z.enum(['cash', 'bank']),
@@ -51,7 +50,7 @@ interface Sale {
 interface RecordSalePaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  customer: { id: string; name: string } | null;
+  customer: { id: string; name: string; outstanding: number } | null;
   onPaymentRecorded: () => void;
 }
 
@@ -63,13 +62,10 @@ export function RecordSalePaymentDialog({
 }: RecordSalePaymentDialogProps) {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [loadingSales, setLoadingSales] = useState(false);
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
-      sale_id: '',
       amount: '',
       payment_date: new Date().toISOString().split('T')[0],
       payment_mode: 'cash',
@@ -78,126 +74,96 @@ export function RecordSalePaymentDialog({
     },
   });
 
-  // Fetch sales when dialog opens
-  useState(() => {
-    if (open && customer) {
-      fetchCustomerSales();
-    }
-  });
-
-  const fetchCustomerSales = async () => {
-    if (!user || !customer) return;
-
-    setLoadingSales(true);
-    try {
-      const { data: salesData, error: salesError } = await supabase
-        .from('sales')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('bill_customer_id', customer.id)
-        .eq('is_active', true)
-        .order('sale_date', { ascending: false });
-
-      if (salesError) throw salesError;
-
-      if (salesData && salesData.length > 0) {
-        const saleIds = salesData.map(s => s.id);
-        const { data: transData } = await supabase
-          .from('sale_transactions')
-          .select('*')
-          .in('sale_id', saleIds);
-
-        const salesWithOutstanding = salesData.map(sale => {
-          const transactions = transData?.filter(t => t.sale_id === sale.id) || [];
-          const totalPaid = transactions
-            .filter(t => t.transaction_type === 'payment')
-            .reduce((sum, t) => sum + Number(t.amount), 0);
-          const totalRefund = transactions
-            .filter(t => t.transaction_type === 'refund')
-            .reduce((sum, t) => sum + Number(t.amount), 0);
-          const outstanding = Number(sale.sale_amount) - totalPaid + totalRefund;
-
-          return {
-            id: sale.id,
-            sale_number: sale.sale_number || 'N/A',
-            sale_amount: Number(sale.sale_amount),
-            outstanding,
-          };
-        });
-
-        setSales(salesWithOutstanding.filter(s => s.outstanding > 0));
-      }
-    } catch (error) {
-      console.error('Error fetching sales:', error);
-      toast.error('Failed to load sales');
-    } finally {
-      setLoadingSales(false);
-    }
-  };
-
   const onSubmit = async (data: PaymentFormData) => {
     if (!user || !customer) {
       toast.error('Please select a customer');
       return;
     }
 
-    const selectedSale = sales.find(s => s.id === data.sale_id);
-    if (!selectedSale) {
-      toast.error('Please select a valid sale');
+    const paymentAmount = parseFloat(data.amount);
+    if (paymentAmount > customer.outstanding) {
+      toast.error(`Payment amount cannot exceed outstanding amount of ₹${customer.outstanding.toFixed(2)}`);
       return;
     }
 
-    const paymentAmount = parseFloat(data.amount);
-    if (paymentAmount > selectedSale.outstanding) {
-      toast.error(`Payment amount cannot exceed outstanding amount of ₹${selectedSale.outstanding.toFixed(2)}`);
+    if (paymentAmount <= 0) {
+      toast.error('Payment amount must be greater than 0');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.from('sale_transactions').insert({
-        sale_id: data.sale_id,
-        amount: paymentAmount,
-        payment_date: data.payment_date,
-        payment_mode: data.payment_mode,
-        transaction_type: data.transaction_type,
-        notes: data.notes || null,
-      });
-
-      if (error) throw error;
-
-      // Update bill customer outstanding amount
-      const { data: allSalesData } = await supabase
+      // Fetch all unpaid sales for this customer, ordered by date (oldest first)
+      const { data: salesData, error: salesError } = await supabase
         .from('sales')
-        .select('id, sale_amount')
+        .select('*')
+        .eq('user_id', user.id)
         .eq('bill_customer_id', customer.id)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .order('sale_date', { ascending: true });
 
-      if (allSalesData) {
-        const allSaleIds = allSalesData.map(s => s.id);
-        const { data: allTransData } = await supabase
-          .from('sale_transactions')
-          .select('*')
-          .in('sale_id', allSaleIds);
+      if (salesError) throw salesError;
 
-        let totalOutstanding = 0;
-        allSalesData.forEach(sale => {
-          const transactions = allTransData?.filter(t => t.sale_id === sale.id) || [];
-          const totalPaid = transactions
-            .filter(t => t.transaction_type === 'payment')
-            .reduce((sum, t) => sum + Number(t.amount), 0);
-          const totalRefund = transactions
-            .filter(t => t.transaction_type === 'refund')
-            .reduce((sum, t) => sum + Number(t.amount), 0);
-          totalOutstanding += Number(sale.sale_amount) - totalPaid + totalRefund;
+      if (!salesData || salesData.length === 0) {
+        toast.error('No active sales found for this customer');
+        return;
+      }
+
+      // Get all transactions for these sales
+      const saleIds = salesData.map(s => s.id);
+      const { data: transData } = await supabase
+        .from('sale_transactions')
+        .select('*')
+        .in('sale_id', saleIds);
+
+      // Calculate outstanding for each sale
+      const salesWithOutstanding = salesData.map(sale => {
+        const transactions = transData?.filter(t => t.sale_id === sale.id) || [];
+        const totalPaid = transactions
+          .filter(t => t.transaction_type === 'payment')
+          .reduce((sum, t) => sum + Number(t.amount), 0);
+        const totalRefund = transactions
+          .filter(t => t.transaction_type === 'refund')
+          .reduce((sum, t) => sum + Number(t.amount), 0);
+        const outstanding = Number(sale.sale_amount) - totalPaid + totalRefund;
+
+        return { ...sale, outstanding };
+      }).filter(s => s.outstanding > 0);
+
+      // Apply payment to sales (oldest first)
+      let remainingPayment = paymentAmount;
+      const transactionsToInsert = [];
+
+      for (const sale of salesWithOutstanding) {
+        if (remainingPayment <= 0) break;
+
+        const amountToApply = Math.min(remainingPayment, sale.outstanding);
+        transactionsToInsert.push({
+          sale_id: sale.id,
+          amount: amountToApply,
+          payment_date: data.payment_date,
+          payment_mode: data.payment_mode,
+          transaction_type: data.transaction_type,
+          notes: data.notes || null,
         });
 
-        await supabase
-          .from('bill_customers')
-          .update({ outstanding_amount: totalOutstanding })
-          .eq('id', customer.id);
+        remainingPayment -= amountToApply;
       }
+
+      // Insert all transactions
+      const { error: insertError } = await supabase
+        .from('sale_transactions')
+        .insert(transactionsToInsert);
+
+      if (insertError) throw insertError;
+
+      // Update customer outstanding amount
+      const newOutstanding = customer.outstanding - paymentAmount;
+      await supabase
+        .from('bill_customers')
+        .update({ outstanding_amount: Math.max(0, newOutstanding) })
+        .eq('id', customer.id);
 
       toast.success('Payment recorded successfully');
       form.reset();
@@ -213,47 +179,20 @@ export function RecordSalePaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Record Payment for {customer?.name}</DialogTitle>
         </DialogHeader>
 
+        {customer && (
+          <div className="bg-muted p-3 rounded-md">
+            <div className="text-sm text-muted-foreground">Outstanding Balance</div>
+            <div className="text-2xl font-bold">₹{customer.outstanding.toFixed(2)}</div>
+          </div>
+        )}
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="sale_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Select Sale *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a sale" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {loadingSales ? (
-                        <SelectItem value="loading" disabled>
-                          Loading sales...
-                        </SelectItem>
-                      ) : sales.length === 0 ? (
-                        <SelectItem value="none" disabled>
-                          No active sales found
-                        </SelectItem>
-                      ) : (
-                        sales.map((sale) => (
-                          <SelectItem key={sale.id} value={sale.id}>
-                            {sale.sale_number} - Outstanding: ₹{sale.outstanding.toFixed(2)}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}

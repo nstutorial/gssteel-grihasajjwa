@@ -119,7 +119,11 @@ export function BillCustomersList() {
   };
 
   const handleRecordPayment = (customer: BillCustomer) => {
-    setSelectedCustomer(customer);
+    const outstanding = calculateCustomerOutstanding(customer);
+    setSelectedCustomer({
+      ...customer,
+      outstanding_amount: outstanding
+    });
     setRecordPaymentDialogOpen(true);
   };
 
@@ -276,7 +280,11 @@ export function BillCustomersList() {
       <RecordSalePaymentDialog
         open={recordPaymentDialogOpen}
         onOpenChange={setRecordPaymentDialogOpen}
-        customer={selectedCustomer}
+        customer={selectedCustomer ? {
+          id: selectedCustomer.id,
+          name: selectedCustomer.name,
+          outstanding: selectedCustomer.outstanding_amount
+        } : null}
         onPaymentRecorded={fetchCustomers}
       />
     </Card>
