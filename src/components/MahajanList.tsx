@@ -54,6 +54,7 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
   const [mahajanForBill, setMahajanForBill] = useState<Mahajan | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
+  const [firmTransactions, setFirmTransactions] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [advanceDetailsOpen, setAdvanceDetailsOpen] = useState(false);
@@ -90,6 +91,7 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
 
       // Fetch all transactions for calculating outstanding balances
       let transData: any[] = [];
+      let firmTransData: any[] = [];
       if (data && data.length > 0) {
         const billIds = data.flatMap(m => m.bills?.map(b => b.id) || []);
         if (billIds.length > 0) {
@@ -99,10 +101,19 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
             .in('bill_id', billIds);
           transData = transactions || [];
         }
+
+        // Fetch firm transactions for all mahajans
+        const mahajanIds = data.map(m => m.id);
+        const { data: firmTrans } = await supabase
+          .from('firm_transactions')
+          .select('*')
+          .in('mahajan_id', mahajanIds);
+        firmTransData = firmTrans || [];
       }
 
-      // Set both states together to prevent flickering
+      // Set all states together to prevent flickering
       setAllTransactions(transData);
+      setFirmTransactions(firmTransData);
       setMahajans(data || []);
     } catch (error) {
       console.error('Error fetching mahajans:', error);
@@ -154,9 +165,14 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
       return total + balance + interest;
     }, 0);
 
-    // Subtract advance payment from outstanding
+    // Calculate total firm transactions (payments) for this mahajan
+    const firmPayments = firmTransactions
+      .filter(ft => ft.mahajan_id === mahajan.id)
+      .reduce((sum, ft) => sum + Number(ft.amount), 0);
+
+    // Subtract both advance payment and firm payments from outstanding
     const advancePayment = mahajan.advance_payment || 0;
-    return billsTotal - advancePayment;
+    return billsTotal - advancePayment - firmPayments;
   };
 
   const handleDeleteMahajan = async (mahajanId: string) => {

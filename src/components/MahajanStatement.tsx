@@ -306,7 +306,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       if (entry.type === 'bill_disbursement') {
         entry.balance = runningBalance + entry.debit;
         runningBalance += entry.debit;
-      } else if (entry.type === 'payment_paid') {
+      } else if (entry.type === 'payment_paid' || entry.type === 'firm_payment') {
         entry.balance = runningBalance - entry.credit;
         runningBalance -= entry.credit;
       }
