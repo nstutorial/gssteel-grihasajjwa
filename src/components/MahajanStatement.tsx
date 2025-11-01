@@ -47,6 +47,14 @@ interface BillTransaction {
   };
 }
 
+interface FirmTransaction {
+  id: string;
+  amount: number;
+  transaction_date: string;
+  transaction_type: string;
+  description: string | null;
+}
+
 interface StatementEntry {
   date: string;
   description: string;
@@ -54,7 +62,7 @@ interface StatementEntry {
   debit: number;
   credit: number;
   balance: number;
-  type: 'bill_disbursement' | 'payment_paid' | 'interest_accrued';
+  type: 'bill_disbursement' | 'payment_paid' | 'interest_accrued' | 'firm_payment';
 }
 
 interface MahajanStatementProps {
@@ -66,6 +74,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
   const { toast } = useToast();
   const [bills, setBills] = useState<Bill[]>([]);
   const [transactions, setTransactions] = useState<BillTransaction[]>([]);
+  const [firmTransactions, setFirmTransactions] = useState<FirmTransaction[]>([]);
   const [statement, setStatement] = useState<StatementEntry[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -78,10 +87,51 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
   }, [user, mahajan.id]);
 
   useEffect(() => {
-    if (bills.length > 0) {
+    if (bills.length > 0 || firmTransactions.length > 0) {
       generateStatement();
     }
-  }, [bills, transactions, startDate, endDate]);
+  }, [bills, transactions, firmTransactions, startDate, endDate]);
+
+  // Realtime subscriptions for partner transaction updates
+  useEffect(() => {
+    if (!mahajan.id) return;
+
+    const partnerTransactionsChannel = supabase
+      .channel('mahajan-partner-transactions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'partner_transactions',
+          filter: `mahajan_id=eq.${mahajan.id}`
+        },
+        () => {
+          fetchMahajanData();
+        }
+      )
+      .subscribe();
+
+    const billTransactionsChannel = supabase
+      .channel('mahajan-bill-transactions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bill_transactions'
+        },
+        () => {
+          fetchMahajanData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(partnerTransactionsChannel);
+      supabase.removeChannel(billTransactionsChannel);
+    };
+  }, [mahajan.id]);
 
   const fetchMahajanData = async () => {
     try {
@@ -96,6 +146,15 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
         .order('bill_date', { ascending: false });
 
       if (billsError) throw billsError;
+
+      // Fetch firm transactions for this mahajan
+      const { data: firmTransData, error: firmTransError } = await supabase
+        .from('firm_transactions')
+        .select('*')
+        .eq('mahajan_id', mahajan.id)
+        .order('transaction_date', { ascending: true });
+
+      if (firmTransError) throw firmTransError;
 
       let transactionsData: BillTransaction[] = [];
 
@@ -114,9 +173,10 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
         transactionsData = transData || [];
       }
 
-      // Update both states together after all data is fetched
+      // Update all states together after all data is fetched
       setTransactions(transactionsData);
       setBills(billsData || []);
+      setFirmTransactions(firmTransData || []);
 
     } catch (error) {
       console.error('Error fetching mahajan data:', error);
@@ -156,21 +216,84 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       }
     });
 
-    // Add payments paid
+    // Group transactions by date and payment mode
+    const transactionsByDate = new Map<string, BillTransaction[]>();
+    
     transactions.forEach(transaction => {
       const paymentDate = new Date(transaction.payment_date);
       const isInRange = (!startDate || paymentDate >= new Date(startDate)) && 
                        (!endDate || paymentDate <= new Date(endDate));
 
       if (isInRange) {
+        const key = `${transaction.payment_date}-${transaction.transaction_type}-${transaction.payment_mode}`;
+        if (!transactionsByDate.has(key)) {
+          transactionsByDate.set(key, []);
+        }
+        transactionsByDate.get(key)!.push(transaction);
+      }
+    });
+
+    // Create consolidated payment entries
+    transactionsByDate.forEach((groupedTransactions, key) => {
+      const firstTransaction = groupedTransactions[0];
+      const totalAmount = groupedTransactions.reduce((sum, t) => sum + t.amount, 0);
+      
+      // Extract reference number from notes
+      let referenceNumber = '';
+      if (firstTransaction.notes) {
+        const refMatch = firstTransaction.notes.match(/REF#(\d{8})/);
+        if (refMatch) {
+          referenceNumber = refMatch[1];
+        }
+      }
+      
+      // Build description with all bill details
+      let description = `Payment Received`;
+      
+      // Extract partner info if present
+      let partnerInfo = '';
+      if (firstTransaction.notes && firstTransaction.notes.includes('Payment from partner:')) {
+        const partnerMatch = firstTransaction.notes.match(/Payment from partner: ([^-]+)/);
+        if (partnerMatch) {
+          partnerInfo = ` from ${partnerMatch[1].trim()}`;
+        }
+      }
+      
+      description += partnerInfo;
+      
+      // Add bill details
+      const billDetails = groupedTransactions.map(t => 
+        `₹${t.amount.toFixed(2)} for payment of ${t.bill.bill_number}`
+      ).join('\n');
+      
+      description += '\n' + billDetails;
+
+      allEntries.push({
+        date: firstTransaction.payment_date,
+        description: description,
+        reference: referenceNumber || 'N/A',
+        debit: 0,
+        credit: totalAmount,
+        balance: 0, // Will be calculated after sorting
+        type: 'payment_paid'
+      });
+    });
+
+    // Add firm transactions
+    firmTransactions.forEach(firmTrans => {
+      const transDate = new Date(firmTrans.transaction_date);
+      const isInRange = (!startDate || transDate >= new Date(startDate)) && 
+                       (!endDate || transDate <= new Date(endDate));
+
+      if (isInRange) {
         allEntries.push({
-          date: transaction.payment_date,
-          description: `Paid - ${transaction.bill.description || 'Bill'} (${transaction.bill.bill_number}) - ${transaction.transaction_type} via ${transaction.payment_mode}-${transaction.notes}`,
-          reference: transaction.id,
+          date: firmTrans.transaction_date,
+          description: `Firm Payment - ${firmTrans.description || 'Payment from firm account'}`,
+          reference: 'FIRM',
           debit: 0,
-          credit: transaction.amount,
+          credit: firmTrans.amount,
           balance: 0, // Will be calculated after sorting
-          type: 'payment_paid'
+          type: 'firm_payment'
         });
       }
     });
@@ -498,16 +621,18 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
                       <td className="p-3 text-sm">{format(new Date(entry.date), 'dd/MM/yyyy')}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
-                          <span>{entry.description}</span>
+                          <span className="whitespace-pre-line">{entry.description}</span>
                           <Badge 
-                            variant={
+                             variant={
                               entry.type === 'bill_disbursement' ? 'destructive' :
-                              entry.type === 'payment_paid' ? 'default' : 'secondary'
+                              entry.type === 'payment_paid' ? 'default' :
+                              entry.type === 'firm_payment' ? 'secondary' : 'secondary'
                             }
                             className="text-xs"
                           >
                             {entry.type === 'bill_disbursement' ? 'Bill' :
-                             entry.type === 'payment_paid' ? 'Payment' : 'Interest'}
+                             entry.type === 'payment_paid' ? 'Payment' :
+                             entry.type === 'firm_payment' ? 'Firm Payment' : 'Interest'}
                           </Badge>
                         </div>
                       </td>

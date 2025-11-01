@@ -50,7 +50,7 @@ interface LoanTransaction {
   amount: number;
   payment_date: string;
   transaction_type: string;
-  payment_mode: string;
+  payment_mode: 'cash' | 'bank';
   notes: string | null;
   loan: {
     description: string | null;
@@ -122,7 +122,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
         .order('payment_date', { ascending: true });
 
       if (error) throw error;
-      setTransactions(data || []);
+      setTransactions((data || []) as any);
     } catch (error) {
       console.error('Error fetching transactions:', error);
     }
@@ -134,63 +134,21 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
 
     setLoading(true);
     try {
-      const paymentAmount = parseFloat(paymentData.amount);
-      
-      // Find the selected loan
-      const selectedLoan = loans.find(l => l.id === selectedLoanId);
-      if (!selectedLoan) throw new Error('Loan not found');
-      
-      // Calculate current outstanding interest and principal
-      const currentBalance = calculateLoanBalance(selectedLoan);
-      const currentInterest = calculateInterest(selectedLoan, currentBalance);
-      
-      // Split payment: interest first, then principal
-      let interestPayment = 0;
-      let principalPayment = 0;
-      
-      if (currentInterest > 0 && paymentAmount > 0) {
-        // Pay interest first
-        interestPayment = Math.min(paymentAmount, currentInterest);
-        // Remaining amount goes to principal
-        principalPayment = paymentAmount - interestPayment;
-      } else {
-        // No interest, all goes to principal
-        principalPayment = paymentAmount;
-      }
-      
-      // Create transaction records
-      const transactions = [];
-      
-      if (interestPayment > 0) {
-        transactions.push({
-          loan_id: selectedLoanId,
-          amount: interestPayment,
-          transaction_type: 'interest',
-          payment_mode: paymentData.payment_mode,
-          notes: paymentData.notes ? `${paymentData.notes} (Interest portion)` : 'Interest portion',
-        });
-      }
-      
-      if (principalPayment > 0) {
-        transactions.push({
-          loan_id: selectedLoanId,
-          amount: principalPayment,
-          transaction_type: 'principal',
-          payment_mode: paymentData.payment_mode,
-          notes: paymentData.notes ? `${paymentData.notes} (Principal portion)` : 'Principal portion',
-        });
-      }
-      
-      // Insert all transactions
       const { error } = await supabase
         .from('loan_transactions')
-        .insert(transactions);
+        .insert({
+          loan_id: selectedLoanId,
+          amount: parseFloat(paymentData.amount),
+          transaction_type: paymentData.paymentType,
+          payment_mode: paymentData.payment_mode,
+          notes: paymentData.notes || null,
+        });
 
       if (error) throw error;
 
       toast({
         title: "Payment recorded",
-        description: `₹${paymentAmount.toFixed(2)} recorded (Interest: ₹${interestPayment.toFixed(2)}, Principal: ₹${principalPayment.toFixed(2)})`,
+        description: "The payment has been successfully recorded.",
       });
 
       setPaymentData({

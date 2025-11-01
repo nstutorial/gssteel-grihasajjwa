@@ -35,6 +35,7 @@ interface Mahajan {
   phone: string | null;
   address: string | null;
   payment_day: string | null;
+  advance_payment?: number;
 }
 
 interface Bill {
@@ -59,6 +60,7 @@ interface BillTransaction {
   bill: {
     description: string | null;
     bill_amount: number;
+    bill_number: string | null;
   };
 }
 
@@ -78,8 +80,17 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
   const [selectedBillId, setSelectedBillId] = useState('');
   const [loading, setLoading] = useState(false);
   const [addBillDialogOpen, setAddBillDialogOpen] = useState(false);
-
+  const [mahajanData, setMahajanData] = useState<Mahajan>(mahajan);
+  const [showAdvanceDialog, setShowAdvanceDialog] = useState(false);
+  
   const [paymentData, setPaymentData] = useState({
+    amount: '',
+    payment_date: new Date().toISOString().split('T')[0],
+    notes: '',
+    payment_mode: 'cash' as 'cash' | 'bank',
+  });
+
+  const [advanceAdjustData, setAdvanceAdjustData] = useState({
     amount: '',
     payment_date: new Date().toISOString().split('T')[0],
     notes: '',
@@ -104,6 +115,17 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
   const fetchBillsAndTransactions = async () => {
     try {
       setLoading(true);
+      
+      // Fetch mahajan data with advance_payment
+      const { data: mahajanInfo, error: mahajanError } = await supabase
+        .from('mahajans')
+        .select('*')
+        .eq('id', mahajan.id)
+        .single();
+
+      if (mahajanError) throw mahajanError;
+      setMahajanData(mahajanInfo);
+
       const { data: billsData, error: billsError } = await supabase
         .from('bills')
         .select('*')
@@ -117,7 +139,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
       if (billsData && billsData.length > 0) {
         const { data: transactions, error: transError } = await supabase
           .from('bill_transactions')
-          .select(`*, bill:bills(description, bill_amount)`)
+          .select(`*, bill:bills(description, bill_amount, bill_number)`)
           .in('bill_id', billsData.map(b => b.id))
           .order('payment_date', { ascending: false });
 
@@ -193,6 +215,9 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
     setLoading(true);
     try {
+      // Generate 8-digit reference number
+      const referenceNumber = Math.floor(10000000 + Math.random() * 90000000).toString();
+      
       // Get all active bills sorted by bill_date (oldest first)
       const activeBills = bills
         .filter(b => b.is_active)
@@ -229,7 +254,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
             transaction_type: 'interest',
             payment_mode: paymentData.payment_mode,
             payment_date: paymentData.payment_date,
-            notes: paymentData.notes || null,
+            notes: `REF#${referenceNumber}${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
           });
           remainingPayment -= interestPayment;
         }
@@ -243,7 +268,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
             transaction_type: 'principal',
             payment_mode: paymentData.payment_mode,
             payment_date: paymentData.payment_date,
-            notes: paymentData.notes || null,
+            notes: `REF#${referenceNumber}${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
           });
           remainingPayment -= principalPayment;
         }
@@ -256,10 +281,26 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
       if (error) throw error;
 
-      toast({
-        title: 'Payment recorded',
-        description: `Payment of ${formatCurrency(paymentAmount)} has been distributed across bills`,
-      });
+      // If there's remaining payment (overpayment), store it as advance
+      if (remainingPayment > 0) {
+        const currentAdvance = mahajanData.advance_payment || 0;
+        const { error: advanceError } = await supabase
+          .from('mahajans')
+          .update({ advance_payment: currentAdvance + remainingPayment })
+          .eq('id', mahajan.id);
+
+        if (advanceError) throw advanceError;
+
+        toast({
+          title: 'Payment recorded',
+          description: `Payment of ${formatCurrency(paymentAmount)} recorded. ${formatCurrency(remainingPayment)} added as advance payment.`,
+        });
+      } else {
+        toast({
+          title: 'Payment recorded',
+          description: `Payment of ${formatCurrency(paymentAmount)} has been distributed across bills`,
+        });
+      }
 
       setPaymentData({
         amount: '',
@@ -277,6 +318,129 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         variant: 'destructive',
         title: 'Error',
         description: 'Failed to record payment',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdvanceAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    const adjustAmount = parseFloat(advanceAdjustData.amount);
+    if (isNaN(adjustAmount) || adjustAmount <= 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Amount',
+        description: 'Please enter a valid amount',
+      });
+      return;
+    }
+
+    const currentAdvance = mahajanData.advance_payment || 0;
+    if (adjustAmount > currentAdvance) {
+      toast({
+        variant: 'destructive',
+        title: 'Insufficient Advance',
+        description: `Maximum adjustable amount is ${formatCurrency(currentAdvance)}`,
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Get all active bills sorted by bill_date (oldest first)
+      const activeBills = bills
+        .filter(b => b.is_active)
+        .sort((a, b) => new Date(a.bill_date).getTime() - new Date(b.bill_date).getTime());
+
+      if (activeBills.length === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'No Active Bills',
+          description: 'There are no active bills to adjust advance payment against',
+        });
+        return;
+      }
+
+      let remainingAdjustment = adjustAmount;
+      const transactionsToInsert: any[] = [];
+
+      // Process each bill sequentially
+      for (const bill of activeBills) {
+        if (remainingAdjustment <= 0) break;
+
+        const balance = calculateBillBalance(bill.id);
+        const interest = calculateInterest(bill, balance);
+        const totalBillOutstanding = balance + interest;
+
+        if (totalBillOutstanding <= 0) continue;
+
+        // Pay interest first
+        if (interest > 0 && remainingAdjustment > 0) {
+          const interestPayment = Math.min(interest, remainingAdjustment);
+          transactionsToInsert.push({
+            bill_id: bill.id,
+            amount: interestPayment,
+            transaction_type: 'interest',
+            payment_mode: advanceAdjustData.payment_mode,
+            payment_date: advanceAdjustData.payment_date,
+            notes: advanceAdjustData.notes ? `${advanceAdjustData.notes} (Advance Adjustment)` : 'Advance Adjustment',
+          });
+          remainingAdjustment -= interestPayment;
+        }
+
+        // Then pay principal
+        if (balance > 0 && remainingAdjustment > 0) {
+          const principalPayment = Math.min(balance, remainingAdjustment);
+          transactionsToInsert.push({
+            bill_id: bill.id,
+            amount: principalPayment,
+            transaction_type: 'principal',
+            payment_mode: advanceAdjustData.payment_mode,
+            payment_date: advanceAdjustData.payment_date,
+            notes: advanceAdjustData.notes ? `${advanceAdjustData.notes} (Advance Adjustment)` : 'Advance Adjustment',
+          });
+          remainingAdjustment -= principalPayment;
+        }
+      }
+
+      // Insert all transactions
+      const { error: transError } = await supabase
+        .from('bill_transactions')
+        .insert(transactionsToInsert);
+
+      if (transError) throw transError;
+
+      // Update advance payment
+      const { error: advanceError } = await supabase
+        .from('mahajans')
+        .update({ advance_payment: currentAdvance - adjustAmount })
+        .eq('id', mahajan.id);
+
+      if (advanceError) throw advanceError;
+
+      toast({
+        title: 'Advance adjusted',
+        description: `${formatCurrency(adjustAmount)} advance payment applied to bills and visible in statements`,
+      });
+
+      setAdvanceAdjustData({
+        amount: '',
+        payment_date: new Date().toISOString().split('T')[0],
+        notes: '',
+        payment_mode: 'cash',
+      });
+      setShowAdvanceDialog(false);
+      fetchBillsAndTransactions();
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      console.error('Error adjusting advance:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to adjust advance payment',
       });
     } finally {
       setLoading(false);
@@ -321,7 +485,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total Bills</CardTitle>
@@ -344,6 +508,24 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{formatCurrency(calculateTotalOutstanding())}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Advance Payment</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{formatCurrency(mahajanData.advance_payment || 0)}</div>
+            {(mahajanData.advance_payment || 0) > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 w-full"
+                onClick={() => setShowAdvanceDialog(true)}
+              >
+                Adjust Advance
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -457,7 +639,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
                 {formatCurrency(calculateTotalOutstanding())}
               </div>
               <p className="text-sm text-muted-foreground">
-                Payment will be applied to bills sequentially (oldest first), clearing interest before principal
+                Payment will be applied to bills sequentially (oldest first), clearing interest before principal. Any overpayment will be stored as advance payment.
               </p>
             </div>
 
@@ -530,6 +712,86 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
           if (onUpdate) onUpdate();
         }}
       />
+
+      {/* Advance Adjustment Dialog */}
+      <Dialog open={showAdvanceDialog} onOpenChange={setShowAdvanceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adjust Advance Payment</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAdvanceAdjustment} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Available Advance</Label>
+              <div className="text-2xl font-bold text-green-600">
+                {formatCurrency(mahajanData.advance_payment || 0)}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Apply advance payment to bills. Payment will be distributed to bills sequentially (oldest first) and appear in statements.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="adjust_amount">Adjustment Amount</Label>
+              <Input
+                id="adjust_amount"
+                type="number"
+                step="0.01"
+                max={mahajanData.advance_payment || 0}
+                placeholder="Enter amount"
+                value={advanceAdjustData.amount}
+                onChange={(e) => setAdvanceAdjustData({ ...advanceAdjustData, amount: e.target.value })}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Maximum: {formatCurrency(mahajanData.advance_payment || 0)}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="adjust_payment_date">Payment Date</Label>
+              <Input
+                id="adjust_payment_date"
+                type="date"
+                value={advanceAdjustData.payment_date}
+                onChange={(e) => setAdvanceAdjustData({ ...advanceAdjustData, payment_date: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Payment Mode</Label>
+              <Select 
+                value={advanceAdjustData.payment_mode} 
+                onValueChange={(value: 'cash' | 'bank') => 
+                  setAdvanceAdjustData({ ...advanceAdjustData, payment_mode: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank">Bank</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="adjust_notes">Notes (Optional)</Label>
+              <Input
+                id="adjust_notes"
+                placeholder="Enter notes"
+                value={advanceAdjustData.notes}
+                onChange={(e) => setAdvanceAdjustData({ ...advanceAdjustData, notes: e.target.value })}
+              />
+            </div>
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Adjusting...' : 'Adjust Advance'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

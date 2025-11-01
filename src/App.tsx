@@ -15,6 +15,11 @@ import PasswordManagement from "./pages/PasswordManagement";
 import Reminders from "./pages/Reminders";
 import BillReminders from "./pages/BillReminders";
 import BillCustomers from "./pages/BillCustomers";
+import BillCustomerDetails from "./pages/BillCustomerDetails";
+import Partners from "./pages/Partners";
+import PartnerDetails from "./pages/PartnerDetails";
+import FirmAccounts from "./pages/FirmAccounts";
+import FirmAccountDetails from "./pages/FirmAccountDetails";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -107,6 +112,36 @@ const AppRoutes = () => {
       <Route path="/bill-reminders" element={
         <ProtectedRoute>
           <BillReminders />
+        </ProtectedRoute>
+      } />
+      <Route path="/bill-customers" element={
+        <ProtectedRoute>
+          <BillCustomers />
+        </ProtectedRoute>
+      } />
+      <Route path="/bill-customers/:id" element={
+        <ProtectedRoute>
+          <BillCustomerDetails />
+        </ProtectedRoute>
+      } />
+      <Route path="/partners" element={
+        <ProtectedRoute>
+          <Partners />
+        </ProtectedRoute>
+      } />
+      <Route path="/partners/:id" element={
+        <ProtectedRoute>
+          <PartnerDetails />
+        </ProtectedRoute>
+      } />
+      <Route path="/firm-accounts" element={
+        <ProtectedRoute>
+          <FirmAccounts />
+        </ProtectedRoute>
+      } />
+      <Route path="/firm-accounts/:id" element={
+        <ProtectedRoute>
+          <FirmAccountDetails />
         </ProtectedRoute>
       } />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

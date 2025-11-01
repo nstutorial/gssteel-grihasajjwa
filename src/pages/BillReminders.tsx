@@ -177,12 +177,12 @@ const BillReminders = () => {
     try {
       setLoadingSchedules(true);
       
-      // Fetch mahajans with the selected payment day
+      // Fetch mahajans with the selected payment day or null payment_day
       const { data: mahajans, error: mahajansError } = await supabase
         .from('mahajans')
         .select('id, name, payment_day')
         .eq('user_id', user?.id)
-        .eq('payment_day', selectedPaymentDay);
+        .or(`payment_day.eq.${selectedPaymentDay},payment_day.is.null`);
 
       if (mahajansError) throw mahajansError;
 

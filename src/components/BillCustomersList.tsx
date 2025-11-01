@@ -10,7 +10,8 @@ import { AddBillCustomerDialog } from './AddBillCustomerDialog';
 import { EditBillCustomerDialog } from './EditBillCustomerDialog';
 import { AddSaleDialog } from './AddSaleDialog';
 import { RecordSalePaymentDialog } from './RecordSalePaymentDialog';
-import { Plus, Search, Edit, Phone, Mail, MapPin, DollarSign } from 'lucide-react';
+import { Plus, Search, Edit, Phone, Mail, MapPin, DollarSign, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface BillCustomer {
@@ -39,6 +40,7 @@ interface SaleTransaction {
 export function BillCustomersList() {
   const { user } = useAuth();
   const { settings: controlSettings } = useControl();
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState<BillCustomer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<BillCustomer[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -225,6 +227,14 @@ export function BillCustomersList() {
 
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/bill-customers/${customer.id}`)}
+                            title="View Statement"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"

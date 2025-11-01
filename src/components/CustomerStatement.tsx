@@ -39,7 +39,7 @@ interface LoanTransaction {
   amount: number;
   payment_date: string;
   transaction_type: string;
-  payment_mode: string;
+  payment_mode: 'cash' | 'bank';
   notes: string | null;
   loan: {
     loan_number: string;
@@ -110,7 +110,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
           .order('payment_date', { ascending: true });
 
         if (transactionsError) throw transactionsError;
-        setTransactions(transactionsData || []);
+        setTransactions((transactionsData || []) as any);
       } else {
         setTransactions([]);
       }

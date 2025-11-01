@@ -16,7 +16,7 @@ interface LoanTransaction {
   amount: number;
   payment_date: string;
   transaction_type: string;
-  payment_mode: string;
+  payment_mode: 'cash' | 'bank';
   notes: string | null;
   loan: {
     loan_number: string;
@@ -81,7 +81,7 @@ const DateWisePayments: React.FC<DateWisePaymentsProps> = ({ onUpdate }) => {
 
       if (error) throw error;
 
-      setTransactions(data || []);
+      setTransactions((data || []) as any);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast({

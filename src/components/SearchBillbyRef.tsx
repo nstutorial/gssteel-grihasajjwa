@@ -165,9 +165,9 @@ const SearchBillbyRef = ({ bills }: { bills: Bill[] }) => {
                     <Button variant="outline" onClick={() => setEditBill(bill)}>
                       Edit
                     </Button>
-                    {/* <Button variant="destructive" onClick={() => handleDelete(bill.id)}>
+                     <Button variant="destructive" onClick={() => handleDelete(bill.id)}>
                       Delete
-                    </Button> */}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

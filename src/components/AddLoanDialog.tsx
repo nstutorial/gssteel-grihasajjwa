@@ -189,7 +189,7 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
 
           <div className="space-y-2">
             <Label>Interest Type</Label>
-            <Select disabled={false}
+            <Select disabled={true}
               value={formData.interestType} 
               onValueChange={(value: 'daily' | 'monthly' | 'none') => setFormData({ ...formData, interestType: value })}
             >
@@ -279,4 +279,3 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
 };
 
 export default AddLoanDialog;
-

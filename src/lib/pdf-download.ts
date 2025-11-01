@@ -53,11 +53,12 @@ export class PDFDownloader {
         duration: 'short'
       });
 
-      // Share the file  
+      // Share the file
       await Share.share({
         title: 'Money Tracker Pro Statement',
         text: 'Please find attached your statement PDF',
-        files: [base64Data] as any
+        files: [base64Data],
+        dialogTitle: 'Share PDF'
       });
 
     } catch (error) {

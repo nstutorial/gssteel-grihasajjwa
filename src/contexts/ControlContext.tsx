@@ -101,6 +101,8 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
           allowAddPayment: true,
           allowPaymentManager: true,
           allowRecordPayment: true,
+          allowBillManagement: true,
+          allowMahajanDeletion: true,
         };
         const dbSettings = (data as any).control_settings;
         setSettings({
