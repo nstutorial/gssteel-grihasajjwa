@@ -77,6 +77,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
   const [bills, setBills] = useState<Bill[]>([]);
   const [transactions, setTransactions] = useState<BillTransaction[]>([]);
   const [firmTransactions, setFirmTransactions] = useState<any[]>([]);
+  const [firmAccounts, setFirmAccounts] = useState<any[]>([]);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -89,6 +90,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
     payment_date: new Date().toISOString().split('T')[0],
     notes: '',
     payment_mode: 'cash' as 'cash' | 'bank',
+    firm_account_id: '',
   });
 
   const [advanceAdjustData, setAdvanceAdjustData] = useState({
@@ -100,7 +102,10 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
   // Fetch bills and transactions together to prevent flickering
   useEffect(() => {
-    if (user) fetchBillsAndTransactions();
+    if (user) {
+      fetchBillsAndTransactions();
+      fetchFirmAccounts();
+    }
   }, [user, mahajan.id]);
 
   // Listen for refresh events (when bills/transactions are edited)
@@ -137,6 +142,22 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
       supabase.removeChannel(firmTransactionsChannel);
     };
   }, [mahajan.id]);
+
+  const fetchFirmAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('firm_accounts')
+        .select('*')
+        .eq('user_id', user?.id)
+        .eq('is_active', true)
+        .order('account_name', { ascending: true });
+
+      if (error) throw error;
+      setFirmAccounts(data || []);
+    } catch (error: any) {
+      console.error('Error fetching firm accounts:', error);
+    }
+  };
 
   const fetchBillsAndTransactions = async () => {
     try {
@@ -256,6 +277,36 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
       return;
     }
 
+    // Validate firm account selection
+    if (!paymentData.firm_account_id) {
+      toast({
+        variant: 'destructive',
+        title: 'Firm Account Required',
+        description: 'Please select a firm account for this payment',
+      });
+      return;
+    }
+
+    // Check firm account balance
+    const selectedAccount = firmAccounts.find(acc => acc.id === paymentData.firm_account_id);
+    if (!selectedAccount) {
+      toast({
+        variant: 'destructive',
+        title: 'Account Not Found',
+        description: 'Selected firm account not found',
+      });
+      return;
+    }
+
+    if (selectedAccount.current_balance < paymentAmount) {
+      toast({
+        variant: 'destructive',
+        title: 'Insufficient Balance',
+        description: `Available balance: ${formatCurrency(selectedAccount.current_balance)}. Cannot process payment of ${formatCurrency(paymentAmount)}.`,
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       // Generate 8-digit reference number
@@ -324,6 +375,28 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
       if (error) throw error;
 
+      // Create firm transaction for the payment
+      const { error: firmTransError } = await supabase
+        .from('firm_transactions')
+        .insert({
+          firm_account_id: paymentData.firm_account_id,
+          mahajan_id: mahajan.id,
+          transaction_type: 'payment',
+          amount: paymentAmount,
+          transaction_date: paymentData.payment_date,
+          description: `Payment to ${mahajan.name}${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
+        });
+
+      if (firmTransError) throw firmTransError;
+
+      // Update firm account balance
+      const { error: balanceError } = await supabase
+        .from('firm_accounts')
+        .update({ current_balance: selectedAccount.current_balance - paymentAmount })
+        .eq('id', paymentData.firm_account_id);
+
+      if (balanceError) throw balanceError;
+
       // If there's remaining payment (overpayment), store it as advance
       if (remainingPayment > 0) {
         const currentAdvance = mahajanData.advance_payment || 0;
@@ -350,10 +423,12 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         payment_date: new Date().toISOString().split('T')[0],
         notes: '',
         payment_mode: 'cash',
+        firm_account_id: '',
       });
       setShowPaymentDialog(false);
 
       fetchBillsAndTransactions();
+      fetchFirmAccounts();
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error('Error recording payment:', error);
@@ -684,6 +759,30 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
               <p className="text-sm text-muted-foreground">
                 Payment will be applied to bills sequentially (oldest first), clearing interest before principal. Any overpayment will be stored as advance payment.
               </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="firm_account">Firm Account *</Label>
+              <Select
+                value={paymentData.firm_account_id}
+                onValueChange={(value) => setPaymentData({ ...paymentData, firm_account_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select firm account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {firmAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.account_name} - {formatCurrency(account.current_balance)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {paymentData.firm_account_id && (
+                <p className="text-sm text-muted-foreground">
+                  Available balance: {formatCurrency(firmAccounts.find(a => a.id === paymentData.firm_account_id)?.current_balance || 0)}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
