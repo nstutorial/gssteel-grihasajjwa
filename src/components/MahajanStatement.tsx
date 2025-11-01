@@ -353,6 +353,12 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
     }, 0);
   };
 
+  const calculateStatementOutstanding = () => {
+    const totalDebits = statement.reduce((sum, entry) => sum + entry.debit, 0);
+    const totalCredits = statement.reduce((sum, entry) => sum + entry.credit, 0);
+    return totalDebits - totalCredits;
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -503,12 +509,22 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       doc.text("Account Summary", margin, y); 
       y += 15;
   
+      const totalDebits = statement.reduce((sum, entry) => sum + entry.debit, 0);
+      const totalCredits = statement.reduce((sum, entry) => sum + entry.credit, 0);
+      const outstandingBalance = totalDebits - totalCredits;
+  
       doc.setFillColor(249, 249, 249);
-      doc.rect(margin, y - 5, tableWidth, 20, "F");
+      doc.rect(margin, y - 5, tableWidth, 30, "F");
   
       doc.setFontSize(10).setFont("helvetica", "normal");
-      doc.text(`Total Outstanding Balance: ${formatCurrency(calculateTotalOutstanding()).replace("₹", "")}`, margin + 5, y);
+      doc.text(`Total Debits: ${formatCurrency(totalDebits).replace("₹", "")}`, margin + 5, y);
       y += 6;
+      doc.text(`Total Credits: ${formatCurrency(totalCredits).replace("₹", "")}`, margin + 5, y);
+      y += 6;
+      doc.setFont("helvetica", "bold");
+      doc.text(`Outstanding Balance: ${formatCurrency(outstandingBalance).replace("₹", "")}`, margin + 5, y);
+      y += 6;
+      doc.setFont("helvetica", "normal");
       doc.text(`Total Transactions: ${statement.length}`, margin + 5, y);
   
       // ---------------- FOOTER ---------------- 
@@ -577,18 +593,28 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{bills.length}</div>
-              <div className="text-sm text-blue-600">Total Bills</div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="text-center p-4 bg-red-50 rounded-lg">
+              <div className="text-2xl font-bold text-red-600">
+                {formatCurrency(statement.reduce((sum, entry) => sum + entry.debit, 0))}
+              </div>
+              <div className="text-sm text-red-600">Total Debits</div>
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{transactions.length}</div>
-              <div className="text-sm text-green-600">Total Payments</div>
+              <div className="text-2xl font-bold text-green-600">
+                {formatCurrency(statement.reduce((sum, entry) => sum + entry.credit, 0))}
+              </div>
+              <div className="text-sm text-green-600">Total Credits</div>
             </div>
             <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">{formatCurrency(calculateTotalOutstanding())}</div>
+              <div className="text-2xl font-bold text-orange-600">
+                {formatCurrency(calculateStatementOutstanding())}
+              </div>
               <div className="text-sm text-orange-600">Outstanding Balance</div>
+            </div>
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">{statement.length}</div>
+              <div className="text-sm text-blue-600">Total Entries</div>
             </div>
           </div>
         </CardContent>
@@ -638,15 +664,15 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
                       </td>
                       <td className="p-3 text-sm text-gray-600">{entry.reference}</td>
                       <td className="p-3 text-right">
-                        {entry.credit > 0 ? (
-                          <span className="text-red-600 font-medium">{formatCurrency(entry.credit)}</span>
+                        {entry.debit > 0 ? (
+                          <span className="text-red-600 font-medium">{formatCurrency(entry.debit)}</span>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
                       <td className="p-3 text-right">
-                        {entry.debit > 0 ? (
-                          <span className="text-green-600 font-medium">{formatCurrency(entry.debit)}</span>
+                        {entry.credit > 0 ? (
+                          <span className="text-green-600 font-medium">{formatCurrency(entry.credit)}</span>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
@@ -655,6 +681,20 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot className="bg-muted/50 font-bold border-t-2">
+                  <tr>
+                    <td colSpan={3} className="p-3 text-right">Total:</td>
+                    <td className="p-3 text-right text-red-600">
+                      {formatCurrency(statement.reduce((sum, entry) => sum + entry.debit, 0))}
+                    </td>
+                    <td className="p-3 text-right text-green-600">
+                      {formatCurrency(statement.reduce((sum, entry) => sum + entry.credit, 0))}
+                    </td>
+                    <td className="p-3 text-right text-orange-600">
+                      {formatCurrency(calculateStatementOutstanding())}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           ) : (
