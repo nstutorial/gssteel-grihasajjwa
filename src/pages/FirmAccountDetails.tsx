@@ -116,9 +116,16 @@ export default function FirmAccountDetails() {
       if (txnError) throw txnError;
 
       const calculatedBalance = (txns || []).reduce((balance, txn) => {
-        if (txn.transaction_type === 'partner_deposit' || txn.transaction_type === 'income') {
+        // Credits (money coming in): deposits, income, refunds
+        if (txn.transaction_type === 'partner_deposit' || 
+            txn.transaction_type === 'income' || 
+            txn.transaction_type === 'refund') {
           return balance + txn.amount;
-        } else if (txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund') {
+        } 
+        // Debits (money going out): withdrawals, expenses, payments
+        else if (txn.transaction_type === 'partner_withdrawal' || 
+                 txn.transaction_type === 'expense' ||
+                 txn.transaction_type === 'payment') {
           return balance - txn.amount;
         }
         return balance;
@@ -364,7 +371,7 @@ export default function FirmAccountDetails() {
         format(new Date(txn.transaction_date), 'dd MMM yyyy'),
         getTransactionTypeLabel(txn.transaction_type),
         getTransactionDescription(txn),
-        `${txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund' ? '-' : '+'}₹${txn.amount.toFixed(2)}`
+        `${txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'payment' ? '-' : '+'}₹${txn.amount.toFixed(2)}`
       ]),
       theme: 'striped',
       headStyles: { fillColor: [59, 130, 246] }
@@ -384,7 +391,7 @@ export default function FirmAccountDetails() {
         Type: getTransactionTypeLabel(txn.transaction_type),
         Description: getTransactionDescription(txn),
         Amount: txn.amount,
-        'Amount Type': txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund' ? 'Debit' : 'Credit'
+        'Amount Type': txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'payment' ? 'Debit' : 'Credit'
       }))
     );
     

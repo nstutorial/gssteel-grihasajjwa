@@ -47,9 +47,16 @@ export default function FirmAccounts() {
             .eq('firm_account_id', account.id);
 
           const calculatedBalance = (txns || []).reduce((balance, txn) => {
-            if (txn.transaction_type === 'partner_deposit' || txn.transaction_type === 'income') {
+            // Credits (money coming in): deposits, income, refunds
+            if (txn.transaction_type === 'partner_deposit' || 
+                txn.transaction_type === 'income' || 
+                txn.transaction_type === 'refund') {
               return balance + txn.amount;
-            } else if (txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' ||  txn.transaction_type === 'refund') {
+            } 
+            // Debits (money going out): withdrawals, expenses, payments
+            else if (txn.transaction_type === 'partner_withdrawal' || 
+                     txn.transaction_type === 'expense' ||
+                     txn.transaction_type === 'payment') {
               return balance - txn.amount;
             }
             return balance;
