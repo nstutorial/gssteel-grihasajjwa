@@ -342,6 +342,21 @@ export default function FirmAccountDetails() {
     currentPage * itemsPerPage
   );
 
+  // Calculate page totals
+  const pageCredits = paginatedTransactions.reduce((sum, txn) => {
+    if (txn.transaction_type === 'partner_deposit' || txn.transaction_type === 'income') {
+      return sum + txn.amount;
+    }
+    return sum;
+  }, 0);
+
+  const pageDebits = paginatedTransactions.reduce((sum, txn) => {
+    if (txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund') {
+      return sum + txn.amount;
+    }
+    return sum;
+  }, 0);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, startDate, endDate]);
@@ -373,18 +388,41 @@ export default function FirmAccountDetails() {
     
     yPos += 5;
     
-    autoTable(doc, {
-      startY: yPos,
-      head: [['Date', 'Type', 'Sub Type', 'Description', 'Amount']],
-      body: filteredTransactions.map(txn => [
+    const tableData = filteredTransactions.map(txn => {
+      const isDebit = txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund';
+      return [
         format(new Date(txn.transaction_date), 'dd MMM yyyy'),
         getTransactionTypeLabel(txn.transaction_type),
         getSubTransactionTypeLabel(txn.transaction_sub_type),
         getTransactionDescription(txn),
-        `${txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund' ? '-' : '+'}₹${txn.amount.toFixed(2)}`
-      ]),
+        isDebit ? '' : `₹${txn.amount.toFixed(2)}`,
+        isDebit ? `₹${txn.amount.toFixed(2)}` : ''
+      ];
+    });
+
+    const totalCredits = filteredTransactions.reduce((sum, txn) => {
+      if (txn.transaction_type === 'partner_deposit' || txn.transaction_type === 'income') {
+        return sum + txn.amount;
+      }
+      return sum;
+    }, 0);
+
+    const totalDebits = filteredTransactions.reduce((sum, txn) => {
+      if (txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund') {
+        return sum + txn.amount;
+      }
+      return sum;
+    }, 0);
+
+    tableData.push(['', '', '', 'Total', `₹${totalCredits.toFixed(2)}`, `₹${totalDebits.toFixed(2)}`]);
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Date', 'Type', 'Sub Type', 'Description', 'Credit', 'Debit']],
+      body: tableData,
       theme: 'striped',
-      headStyles: { fillColor: [59, 130, 246] }
+      headStyles: { fillColor: [59, 130, 246] },
+      footStyles: { fillColor: [59, 130, 246], fontStyle: 'bold' }
     });
     
     const pdfBlob = doc.output('blob');
@@ -395,16 +433,42 @@ export default function FirmAccountDetails() {
   const handleExportExcel = () => {
     if (!account) return;
     
-    const ws = XLSX.utils.json_to_sheet(
-      filteredTransactions.map(txn => ({
+    const excelData = filteredTransactions.map(txn => {
+      const isDebit = txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund';
+      return {
         Date: format(new Date(txn.transaction_date), 'dd MMM yyyy'),
         Type: getTransactionTypeLabel(txn.transaction_type),
         'Sub Type': getSubTransactionTypeLabel(txn.transaction_sub_type),
         Description: getTransactionDescription(txn),
-        Amount: txn.amount,
-        'Amount Type': txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund' ? 'Debit' : 'Credit'
-      }))
-    );
+        Credit: isDebit ? '' : txn.amount,
+        Debit: isDebit ? txn.amount : ''
+      };
+    });
+
+    const totalCredits = filteredTransactions.reduce((sum, txn) => {
+      if (txn.transaction_type === 'partner_deposit' || txn.transaction_type === 'income') {
+        return sum + txn.amount;
+      }
+      return sum;
+    }, 0);
+
+    const totalDebits = filteredTransactions.reduce((sum, txn) => {
+      if (txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund') {
+        return sum + txn.amount;
+      }
+      return sum;
+    }, 0);
+
+    excelData.push({
+      Date: '',
+      Type: '',
+      'Sub Type': '',
+      Description: 'Total',
+      Credit: totalCredits,
+      Debit: totalDebits
+    });
+
+    const ws = XLSX.utils.json_to_sheet(excelData);
     
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
@@ -557,7 +621,8 @@ export default function FirmAccountDetails() {
                     <TableHead>Type</TableHead>
                     <TableHead>Sub Type</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Credit</TableHead>
+                    <TableHead className="text-right">Debit</TableHead>
                     {(settings.allowEdit || settings.allowDelete) && (
                       <TableHead className="text-right">Actions</TableHead>
                     )}
@@ -578,19 +643,17 @@ export default function FirmAccountDetails() {
                     <TableCell className="max-w-md truncate">
                       {getTransactionDescription(transaction)}
                     </TableCell>
-                    <TableCell className={`text-right font-medium ${
-                      transaction.transaction_type === 'partner_withdrawal' || 
-                      transaction.transaction_type === 'expense' ||
-                       transaction.transaction_type === 'refund' 
-                        ? 'text-destructive' 
-                        : 'text-green-600'
-                    }`}>
-                      {transaction.transaction_type === 'partner_withdrawal' || 
-                       transaction.transaction_type === 'expense'  ||
-                        transaction.transaction_type === 'refund'  
-                        ? '-' 
-                        : '+'}
-                      ₹{transaction.amount.toFixed(2)}
+                    <TableCell className="text-right font-medium text-green-600">
+                      {(transaction.transaction_type === 'partner_deposit' || transaction.transaction_type === 'income') 
+                        ? `₹${transaction.amount.toFixed(2)}` 
+                        : '-'}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-destructive">
+                      {(transaction.transaction_type === 'partner_withdrawal' || 
+                        transaction.transaction_type === 'expense' ||
+                        transaction.transaction_type === 'refund') 
+                        ? `₹${transaction.amount.toFixed(2)}` 
+                        : '-'}
                     </TableCell>
                     {(settings.allowEdit || settings.allowDelete) && (
                       <TableCell className="text-right">
@@ -618,6 +681,14 @@ export default function FirmAccountDetails() {
                     )}
                   </TableRow>
                   ))}
+                  <TableRow className="bg-muted/50 font-bold">
+                    <TableCell colSpan={4} className="text-right">Page Total:</TableCell>
+                    <TableCell className="text-right text-green-600">₹{pageCredits.toFixed(2)}</TableCell>
+                    <TableCell className="text-right text-destructive">₹{pageDebits.toFixed(2)}</TableCell>
+                    {(settings.allowEdit || settings.allowDelete) && (
+                      <TableCell></TableCell>
+                    )}
+                  </TableRow>
                 </TableBody>
               </Table>
               
