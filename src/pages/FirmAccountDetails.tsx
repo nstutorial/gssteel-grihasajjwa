@@ -31,6 +31,7 @@ interface FirmAccount {
 interface Transaction {
   id: string;
   transaction_type: string;
+  transaction_sub_type: string | null;
   amount: number;
   partner_id: string | null;
   mahajan_id: string | null;
@@ -281,6 +282,22 @@ export default function FirmAccountDetails() {
     ).join(' ');
   };
 
+  const getSubTransactionTypeLabel = (subType: string | null) => {
+    if (!subType) return '-';
+    
+    // Check if it's a custom type ID
+    if (subType.startsWith('custom_')) {
+      const customTypeId = subType.replace('custom_', '');
+      const customType = Object.values(customTypes).find((_, idx) => 
+        Object.keys(customTypes)[idx] === customTypeId
+      );
+      if (customType) return customType;
+    }
+    
+    // Use the standard labels
+    return getTransactionTypeLabel(subType);
+  };
+
   const getTransactionDescription = (txn: Transaction) => {
     const parts: string[] = [];
     
@@ -306,6 +323,7 @@ export default function FirmAccountDetails() {
   const filteredTransactions = transactions.filter(txn => {
     const matchesSearch = searchQuery === '' || 
       getTransactionTypeLabel(txn.transaction_type).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      getSubTransactionTypeLabel(txn.transaction_sub_type).toLowerCase().includes(searchQuery.toLowerCase()) ||
       getTransactionDescription(txn).toLowerCase().includes(searchQuery.toLowerCase()) ||
       txn.amount.toString().includes(searchQuery) ||
       format(new Date(txn.transaction_date), 'dd MMM yyyy').toLowerCase().includes(searchQuery.toLowerCase());
@@ -357,10 +375,11 @@ export default function FirmAccountDetails() {
     
     autoTable(doc, {
       startY: yPos,
-      head: [['Date', 'Type', 'Description', 'Amount']],
+      head: [['Date', 'Type', 'Sub Type', 'Description', 'Amount']],
       body: filteredTransactions.map(txn => [
         format(new Date(txn.transaction_date), 'dd MMM yyyy'),
         getTransactionTypeLabel(txn.transaction_type),
+        getSubTransactionTypeLabel(txn.transaction_sub_type),
         getTransactionDescription(txn),
         `${txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund' ? '-' : '+'}₹${txn.amount.toFixed(2)}`
       ]),
@@ -380,6 +399,7 @@ export default function FirmAccountDetails() {
       filteredTransactions.map(txn => ({
         Date: format(new Date(txn.transaction_date), 'dd MMM yyyy'),
         Type: getTransactionTypeLabel(txn.transaction_type),
+        'Sub Type': getSubTransactionTypeLabel(txn.transaction_sub_type),
         Description: getTransactionDescription(txn),
         Amount: txn.amount,
         'Amount Type': txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund' ? 'Debit' : 'Credit'
@@ -535,6 +555,7 @@ export default function FirmAccountDetails() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Sub Type</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     {(settings.allowEdit || settings.allowDelete) && (
@@ -550,6 +571,9 @@ export default function FirmAccountDetails() {
                     </TableCell>
                     <TableCell>
                       {getTransactionTypeLabel(transaction.transaction_type)}
+                    </TableCell>
+                    <TableCell>
+                      {getSubTransactionTypeLabel(transaction.transaction_sub_type)}
                     </TableCell>
                     <TableCell className="max-w-md truncate">
                       {getTransactionDescription(transaction)}
