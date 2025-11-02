@@ -5,9 +5,9 @@ import { Share } from '@capacitor/share';
 export class PDFDownloader {
   static async downloadPDF(pdfBlob: Blob, filename: string): Promise<void> {
     try {
-      // Check if we're running in a mobile app
-      const isMobileApp = window.navigator.userAgent.includes('Capacitor') || 
-                         (window as any).Capacitor !== undefined;
+      // Check if Capacitor APIs are actually available (not just the global)
+      const isMobileApp = typeof (window as any).Capacitor !== 'undefined' && 
+                         (window as any).Capacitor.isNativePlatform?.();
 
       if (isMobileApp) {
         // Mobile app: Save to filesystem and share
@@ -18,7 +18,8 @@ export class PDFDownloader {
       }
     } catch (error) {
       console.error('PDF download failed:', error);
-      throw error;
+      // Fallback to browser download on any error
+      this.browserDownload(pdfBlob, filename);
     }
   }
 
@@ -40,38 +41,34 @@ export class PDFDownloader {
       const base64Data = await this.blobToBase64(pdfBlob);
       
       // Save to downloads directory
-      const result = await Filesystem.writeFile({
+      await Filesystem.writeFile({
         path: filename,
         data: base64Data,
         directory: Directory.ExternalStorage,
         recursive: true
       });
 
+      // Try to share the file (optional - won't fail the whole process)
+      try {
+        await Share.share({
+          title: 'Money Tracker Pro Statement',
+          text: 'Please find attached your statement PDF',
+          url: base64Data,
+          dialogTitle: 'Share PDF'
+        });
+      } catch (shareError) {
+        console.log('Share failed, but file was saved:', shareError);
+      }
+
       // Show success toast
       await Toast.show({
-        text: `PDF saved: ${filename}`,
-        duration: 'short'
-      });
-
-      // Share the file
-      await Share.share({
-        title: 'Money Tracker Pro Statement',
-        text: 'Please find attached your statement PDF',
-        files: [base64Data],
-        dialogTitle: 'Share PDF'
+        text: `PDF saved to downloads: ${filename}`,
+        duration: 'long'
       });
 
     } catch (error) {
       console.error('Mobile download failed:', error);
-      
-      // Fallback: Try browser download method
-      this.browserDownload(pdfBlob, filename);
-      
-      // Show error toast
-      await Toast.show({
-        text: 'Download failed, trying browser method',
-        duration: 'short'
-      });
+      throw error; // Let the parent catch handle the fallback
     }
   }
 
