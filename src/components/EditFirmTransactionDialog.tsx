@@ -98,10 +98,19 @@ export function EditFirmTransactionDialog({
 
     setLoading(true);
     try {
+      // Determine main transaction type and sub-type
+      const specificExpenseTypes = ['gst_tax_payment', 'income_tax_payment', 'paid_to_ca', 'paid_to_supplier'];
+      const isSpecificExpenseType = specificExpenseTypes.includes(formData.transaction_type);
+      const isCustomType = formData.transaction_type.startsWith('custom_');
+      
+      const dbTransactionType = isSpecificExpenseType || isCustomType ? 'expense' : formData.transaction_type;
+      const transactionSubType = isSpecificExpenseType || isCustomType ? formData.transaction_type : null;
+
       const { error } = await supabase
         .from('firm_transactions')
         .update({
-          transaction_type: formData.transaction_type,
+          transaction_type: dbTransactionType,
+          transaction_sub_type: transactionSubType,
           amount: parseFloat(formData.amount),
           description: formData.description || null,
           transaction_date: formData.transaction_date

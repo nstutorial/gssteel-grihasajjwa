@@ -366,6 +366,7 @@ export type Database = {
           mahajan_id: string | null
           partner_id: string | null
           transaction_date: string
+          transaction_sub_type: string | null
           transaction_type: string
         }
         Insert: {
@@ -377,6 +378,7 @@ export type Database = {
           mahajan_id?: string | null
           partner_id?: string | null
           transaction_date?: string
+          transaction_sub_type?: string | null
           transaction_type: string
         }
         Update: {
@@ -388,6 +390,7 @@ export type Database = {
           mahajan_id?: string | null
           partner_id?: string | null
           transaction_date?: string
+          transaction_sub_type?: string | null
           transaction_type?: string
         }
         Relationships: [

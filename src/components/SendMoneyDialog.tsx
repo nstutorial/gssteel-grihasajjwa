@@ -137,12 +137,14 @@ export function SendMoneyDialog({
     try {
       const amount = parseFloat(formData.amount);
       
-      // Map custom types and special types to 'expense' for database compliance
-      let transactionType = formData.transaction_type;
-      if (transactionType.startsWith('custom_') || 
-          ['gst_tax_payment', 'income_tax_payment', 'paid_to_ca', 'paid_to_supplier'].includes(transactionType)) {
-        transactionType = 'expense';
-      }
+      // Determine main transaction type and sub-type
+      const specificExpenseTypes = ['gst_tax_payment', 'income_tax_payment', 'paid_to_ca', 'paid_to_supplier'];
+      const isSpecificExpenseType = specificExpenseTypes.includes(formData.transaction_type);
+      const isCustomType = formData.transaction_type.startsWith('custom_');
+      
+      // Store main category (expense/income) and detailed sub-type
+      const dbTransactionType = isSpecificExpenseType || isCustomType ? 'expense' : formData.transaction_type;
+      const transactionSubType = isSpecificExpenseType || isCustomType ? formData.transaction_type : null;
 
       const transactionTypeLabel = getTransactionTypeLabel(formData.transaction_type);
       const recipientName = formData.recipient_type === 'partner' 
@@ -156,7 +158,8 @@ export function SendMoneyDialog({
           .insert({
             firm_account_id: firmAccountId,
             partner_id: formData.recipient_id,
-            transaction_type: transactionType,
+            transaction_type: dbTransactionType,
+            transaction_sub_type: transactionSubType,
             amount: amount,
             transaction_date: formData.transaction_date,
             description: formData.description || `${transactionTypeLabel} - Money sent to ${recipientName} from ${firmAccountName}`
@@ -171,7 +174,8 @@ export function SendMoneyDialog({
             firm_account_id: firmAccountId,
             mahajan_id: formData.recipient_id,
             partner_id: null,
-            transaction_type: transactionType,
+            transaction_type: dbTransactionType,
+            transaction_sub_type: transactionSubType,
             amount: amount,
             transaction_date: formData.transaction_date,
             description: formData.description || `${transactionTypeLabel} - Payment to ${recipientName} from ${firmAccountName}`

@@ -80,9 +80,8 @@ const AddBillDialog: React.FC<AddBillDialogProps> = ({ open, onOpenChange, mahaj
     e.preventDefault();
     if (!user) return;
 
-    // Use mahajan.id if mahajan is provided, otherwise use formData.mahajanId
     const mahajanId = mahajan?.id || formData.mahajanId;
-    
+
     if (!mahajanId) {
       toast({
         variant: "destructive",
@@ -144,12 +143,20 @@ const AddBillDialog: React.FC<AddBillDialogProps> = ({ open, onOpenChange, mahaj
         <DialogHeader>
           <DialogTitle>Add New Bill</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form 
+          onSubmit={handleSubmit} 
+          className="space-y-4"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+            }
+          }}
+        >
           <div className="space-y-2">
             <Label htmlFor="mahajan">Mahajan *</Label>
             {mahajan ? (
               <div className="p-3 border rounded-md bg-gray-50">
-                <div className="text-sm font-medium">{mahajan.name}</div>               
+                <div className="text-sm font-medium">{mahajan.name}</div>                
               </div>
             ) : (
               <Select 

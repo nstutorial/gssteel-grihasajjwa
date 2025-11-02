@@ -15,7 +15,6 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PDFDownloader } from '@/lib/pdf-download';
 import * as XLSX from 'xlsx';
-import { CustomTransactionTypeManager } from '@/components/CustomTransactionTypeManager';
 
 interface FirmAccount {
   id: string;
@@ -49,7 +48,6 @@ export default function FirmAccountDetails() {
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [sendMoneyDialogOpen, setSendMoneyDialogOpen] = useState(false);
-  const [customTypeDialogOpen, setCustomTypeDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -412,7 +410,7 @@ export default function FirmAccountDetails() {
           <h1 className="text-3xl font-bold">Account Statement - {account.account_name}</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setCustomTypeDialogOpen(true)}>
+          <Button variant="outline" onClick={() => navigate('/transaction-types')}>
             <Plus className="h-4 w-4 mr-2" />
             Manage Types
           </Button>
@@ -646,11 +644,6 @@ export default function FirmAccountDetails() {
         firmAccountId={account.id}
         firmAccountName={account.account_name}
         onMoneySent={handleTransactionUpdated}
-      />
-
-      <CustomTransactionTypeManager
-        open={customTypeDialogOpen}
-        onOpenChange={setCustomTypeDialogOpen}
       />
     </div>
   );

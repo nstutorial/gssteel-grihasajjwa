@@ -15,6 +15,7 @@ import { PDFDownloader } from '@/lib/pdf-download';
 interface Transaction {
   id: string;
   transaction_type: string;
+  transaction_sub_type: string | null;
   amount: number;
   partner_id: string | null;
   description: string | null;
@@ -61,10 +62,10 @@ export function FirmAccountStatement({
       if (error) throw error;
       setTransactions(data || []);
       
-      // Calculate type-wise summary
+      // Calculate type-wise summary (use sub-type if available)
       const summary: Record<string, { count: number; total: number }> = {};
       (data || []).forEach(txn => {
-        const type = txn.transaction_type;
+        const type = txn.transaction_sub_type || txn.transaction_type;
         if (!summary[type]) {
           summary[type] = { count: 0, total: 0 };
         }
@@ -106,7 +107,8 @@ export function FirmAccountStatement({
   // Filter transactions based on search query
   const filteredTransactions = transactions.filter(txn => {
     const query = searchQuery.toLowerCase();
-    const typeLabel = getTransactionTypeLabel(txn.transaction_type).toLowerCase();
+    const displayType = txn.transaction_sub_type || txn.transaction_type;
+    const typeLabel = getTransactionTypeLabel(displayType).toLowerCase();
     const description = (txn.description || '').toLowerCase();
     const amount = txn.amount.toString();
     const date = format(new Date(txn.transaction_date), 'dd MMM yyyy').toLowerCase();
@@ -156,12 +158,15 @@ export function FirmAccountStatement({
       });
 
       // Table data
-      const tableData = filteredTransactions.map(txn => [
-        format(new Date(txn.transaction_date), 'dd MMM yyyy'),
-        getTransactionTypeLabel(txn.transaction_type),
-        txn.description || '-',
-        `₹${txn.amount.toFixed(2)}`
-      ]);
+      const tableData = filteredTransactions.map(txn => {
+        const displayType = txn.transaction_sub_type || txn.transaction_type;
+        return [
+          format(new Date(txn.transaction_date), 'dd MMM yyyy'),
+          getTransactionTypeLabel(displayType),
+          txn.description || '-',
+          `₹${txn.amount.toFixed(2)}`
+        ];
+      });
 
       (doc as any).autoTable({
         startY: summaryY + 5,
@@ -250,33 +255,36 @@ export function FirmAccountStatement({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedTransactions.map((transaction) => (
-                      <TableRow key={transaction.id}>
-                        <TableCell>
-                          {format(new Date(transaction.transaction_date), 'dd MMM yyyy')}
-                        </TableCell>
-                        <TableCell>
-                          {getTransactionTypeLabel(transaction.transaction_type)}
-                        </TableCell>
-                        <TableCell className="max-w-md truncate">
-                          {transaction.description || '-'}
-                        </TableCell>
-                        <TableCell className={`text-right font-medium ${
-                          transaction.transaction_type === 'partner_withdrawal' || 
-                          transaction.transaction_type === 'expense' ||
-                          transaction.transaction_type === 'refund'
-                            ? 'text-destructive' 
-                            : 'text-green-600'
-                        }`}>
-                          {transaction.transaction_type === 'partner_withdrawal' || 
-                           transaction.transaction_type === 'expense' ||
-                           transaction.transaction_type === 'refund'
-                            ? '-' 
-                            : '+'}
-                          ₹{transaction.amount.toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {paginatedTransactions.map((transaction) => {
+                      const displayType = transaction.transaction_sub_type || transaction.transaction_type;
+                      return (
+                        <TableRow key={transaction.id}>
+                          <TableCell>
+                            {format(new Date(transaction.transaction_date), 'dd MMM yyyy')}
+                          </TableCell>
+                          <TableCell>
+                            {getTransactionTypeLabel(displayType)}
+                          </TableCell>
+                          <TableCell className="max-w-md truncate">
+                            {transaction.description || '-'}
+                          </TableCell>
+                          <TableCell className={`text-right font-medium ${
+                            transaction.transaction_type === 'partner_withdrawal' || 
+                            transaction.transaction_type === 'expense' ||
+                            transaction.transaction_type === 'refund'
+                              ? 'text-destructive' 
+                              : 'text-green-600'
+                          }`}>
+                            {transaction.transaction_type === 'partner_withdrawal' || 
+                             transaction.transaction_type === 'expense' ||
+                             transaction.transaction_type === 'refund'
+                              ? '-' 
+                              : '+'}
+                            ₹{transaction.amount.toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
 

@@ -519,10 +519,12 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
               <Plus className="h-4 w-4 mr-2" />
               Add Bill
             </Button>
-            <Button onClick={() => setShowPaymentDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Record Payment
-            </Button>
+            {controlSettings.allowRecordPayment && (
+              <Button onClick={() => setShowPaymentDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Record Payment
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -634,7 +636,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
                               </div>
                             )}
                           </div>
-                          {controlSettings.allowBillManagement && bill.is_active && (
+                          {controlSettings.allowBillManagement && controlSettings.allowRecordPayment && bill.is_active && (
                             <Button
                               variant="outline"
                               size="sm"
