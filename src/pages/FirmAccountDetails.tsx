@@ -170,11 +170,8 @@ export default function FirmAccountDetails() {
       
       const typesMap: Record<string, string> = {};
       (data || []).forEach(type => {
-        // Store with the exact name as key
-        typesMap[type.name] = type.name;
-        // Also store snake_case version
-        const snakeCase = type.name.toLowerCase().replace(/\s+/g, '_');
-        typesMap[snakeCase] = type.name;
+        // Store with ID as key and name as value
+        typesMap[type.id] = type.name;
       });
       setCustomTypes(typesMap);
     } catch (error: any) {
@@ -285,13 +282,10 @@ export default function FirmAccountDetails() {
   const getSubTransactionTypeLabel = (subType: string | null) => {
     if (!subType) return '-';
     
-    // Check if it's a custom type ID
-    if (subType.startsWith('custom_')) {
-      const customTypeId = subType.replace('custom_', '');
-      const customType = Object.values(customTypes).find((_, idx) => 
-        Object.keys(customTypes)[idx] === customTypeId
-      );
-      if (customType) return customType;
+    // Check if it's a UUID (custom type ID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(subType)) {
+      return customTypes[subType] || 'Custom ' + subType;
     }
     
     // Use the standard labels
@@ -335,9 +329,24 @@ export default function FirmAccountDetails() {
     return matchesSearch && matchesDateRange;
   });
 
+  // Calculate running balance for all filtered transactions
+  const transactionsWithBalance = filteredTransactions.map((txn, index) => {
+    let balance = account?.opening_balance || 0;
+    // Calculate balance up to current transaction (in reverse chronological order)
+    for (let i = filteredTransactions.length - 1; i >= index; i--) {
+      const t = filteredTransactions[i];
+      if (t.transaction_type === 'partner_deposit' || t.transaction_type === 'income') {
+        balance += t.amount;
+      } else if (t.transaction_type === 'partner_withdrawal' || t.transaction_type === 'expense' || t.transaction_type === 'refund') {
+        balance -= t.amount;
+      }
+    }
+    return { ...txn, balance };
+  });
+
   // Pagination
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
-  const paginatedTransactions = filteredTransactions.slice(
+  const totalPages = Math.ceil(transactionsWithBalance.length / itemsPerPage);
+  const paginatedTransactions = transactionsWithBalance.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -388,7 +397,7 @@ export default function FirmAccountDetails() {
     
     yPos += 5;
     
-    const tableData = filteredTransactions.map(txn => {
+    const tableData = transactionsWithBalance.map(txn => {
       const isDebit = txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund';
       return [
         format(new Date(txn.transaction_date), 'dd MMM yyyy'),
@@ -396,7 +405,8 @@ export default function FirmAccountDetails() {
         getSubTransactionTypeLabel(txn.transaction_sub_type),
         getTransactionDescription(txn),
         isDebit ? '' : `₹${txn.amount.toFixed(2)}`,
-        isDebit ? `₹${txn.amount.toFixed(2)}` : ''
+        isDebit ? `₹${txn.amount.toFixed(2)}` : '',
+        `₹${txn.balance.toFixed(2)}`
       ];
     });
 
@@ -414,11 +424,11 @@ export default function FirmAccountDetails() {
       return sum;
     }, 0);
 
-    tableData.push(['', '', '', 'Total', `₹${totalCredits.toFixed(2)}`, `₹${totalDebits.toFixed(2)}`]);
+    tableData.push(['', '', '', 'Total', `₹${totalCredits.toFixed(2)}`, `₹${totalDebits.toFixed(2)}`, '']);
 
     autoTable(doc, {
       startY: yPos,
-      head: [['Date', 'Type', 'Sub Type', 'Description', 'Credit', 'Debit']],
+      head: [['Date', 'Type', 'Sub Type', 'Description', 'Credit', 'Debit', 'Balance']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [59, 130, 246] },
@@ -433,7 +443,7 @@ export default function FirmAccountDetails() {
   const handleExportExcel = () => {
     if (!account) return;
     
-    const excelData = filteredTransactions.map(txn => {
+    const excelData = transactionsWithBalance.map(txn => {
       const isDebit = txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund';
       return {
         Date: format(new Date(txn.transaction_date), 'dd MMM yyyy'),
@@ -441,7 +451,8 @@ export default function FirmAccountDetails() {
         'Sub Type': getSubTransactionTypeLabel(txn.transaction_sub_type),
         Description: getTransactionDescription(txn),
         Credit: isDebit ? '' : txn.amount,
-        Debit: isDebit ? txn.amount : ''
+        Debit: isDebit ? txn.amount : '',
+        Balance: txn.balance
       };
     });
 
@@ -465,8 +476,9 @@ export default function FirmAccountDetails() {
       'Sub Type': '',
       Description: 'Total',
       Credit: totalCredits,
-      Debit: totalDebits
-    });
+      Debit: totalDebits,
+      Balance: 0
+    } as any);
 
     const ws = XLSX.utils.json_to_sheet(excelData);
     
@@ -614,83 +626,88 @@ export default function FirmAccountDetails() {
             </div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Sub Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                    <TableHead className="text-right">Debit</TableHead>
-                    {(settings.allowEdit || settings.allowDelete) && (
-                      <TableHead className="text-right">Actions</TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedTransactions.map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell>
-                      {format(new Date(transaction.transaction_date), 'dd MMM yyyy')}
-                    </TableCell>
-                    <TableCell>
-                      {getTransactionTypeLabel(transaction.transaction_type)}
-                    </TableCell>
-                    <TableCell>
-                      {getSubTransactionTypeLabel(transaction.transaction_sub_type)}
-                    </TableCell>
-                    <TableCell className="max-w-md truncate">
-                      {getTransactionDescription(transaction)}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-green-600">
-                      {(transaction.transaction_type === 'partner_deposit' || transaction.transaction_type === 'income') 
-                        ? `₹${transaction.amount.toFixed(2)}` 
-                        : '-'}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-destructive">
-                      {(transaction.transaction_type === 'partner_withdrawal' || 
-                        transaction.transaction_type === 'expense' ||
-                        transaction.transaction_type === 'refund') 
-                        ? `₹${transaction.amount.toFixed(2)}` 
-                        : '-'}
-                    </TableCell>
-                    {(settings.allowEdit || settings.allowDelete) && (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          {settings.allowEdit && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditTransaction(transaction)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {settings.allowDelete && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteTransaction(transaction.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Sub Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Credit</TableHead>
+                      <TableHead className="text-right">Debit</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                      {(settings.allowEdit || settings.allowDelete) && (
+                        <TableHead className="text-right">Actions</TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedTransactions.map((transaction) => (
+                    <TableRow key={transaction.id}>
+                      <TableCell>
+                        {format(new Date(transaction.transaction_date), 'dd MMM yyyy')}
                       </TableCell>
-                    )}
-                  </TableRow>
-                  ))}
-                  <TableRow className="bg-muted/50 font-bold">
-                    <TableCell colSpan={4} className="text-right">Page Total:</TableCell>
-                    <TableCell className="text-right text-green-600">₹{pageCredits.toFixed(2)}</TableCell>
-                    <TableCell className="text-right text-destructive">₹{pageDebits.toFixed(2)}</TableCell>
-                    {(settings.allowEdit || settings.allowDelete) && (
+                      <TableCell>
+                        {getTransactionTypeLabel(transaction.transaction_type)}
+                      </TableCell>
+                      <TableCell>
+                        {getSubTransactionTypeLabel(transaction.transaction_sub_type)}
+                      </TableCell>
+                      <TableCell className="max-w-md truncate">
+                        {getTransactionDescription(transaction)}
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-green-600">
+                        {(transaction.transaction_type === 'partner_deposit' || transaction.transaction_type === 'income') 
+                          ? `₹${transaction.amount.toFixed(2)}` 
+                          : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-destructive">
+                        {(transaction.transaction_type === 'partner_withdrawal' || 
+                          transaction.transaction_type === 'expense' ||
+                          transaction.transaction_type === 'refund') 
+                          ? `₹${transaction.amount.toFixed(2)}` 
+                          : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        ₹{transaction.balance.toFixed(2)}
+                      </TableCell>
+                      {(settings.allowEdit || settings.allowDelete) && (
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            {settings.allowEdit && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditTransaction(transaction)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {settings.allowDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteTransaction(transaction.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                    ))}
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell colSpan={4} className="text-right">Page Total:</TableCell>
+                      <TableCell className="text-right text-green-600">₹{pageCredits.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-destructive">₹{pageDebits.toFixed(2)}</TableCell>
                       <TableCell></TableCell>
-                    )}
-                  </TableRow>
-                </TableBody>
-              </Table>
+                      {(settings.allowEdit || settings.allowDelete) && (
+                        <TableCell></TableCell>
+                      )}
+                    </TableRow>
+                  </TableBody>
+                </Table>
               
               {/* Pagination */}
               {totalPages > 1 && (

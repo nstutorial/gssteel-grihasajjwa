@@ -20,6 +20,7 @@ interface Customer {
     principal_amount: number;
     is_active: boolean;
     emi_amount?: number;
+    total_outstanding?: number;
   }>;
 }
 
@@ -67,9 +68,21 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
       fetchCustomers();
     };
 
+    const handlePaymentRecorded = () => {
+      fetchCustomers();
+      if (onUpdate) onUpdate();
+    };
+
     window.addEventListener('customer-added', handleCustomerAdded);
-    return () => window.removeEventListener('customer-added', handleCustomerAdded);
-  }, []);
+    window.addEventListener('payment-recorded', handlePaymentRecorded);
+    window.addEventListener('refresh-customers', handleCustomerAdded);
+    
+    return () => {
+      window.removeEventListener('customer-added', handleCustomerAdded);
+      window.removeEventListener('payment-recorded', handlePaymentRecorded);
+      window.removeEventListener('refresh-customers', handleCustomerAdded);
+    };
+  }, [onUpdate]);
 
   const fetchCustomers = async () => {
     try {
@@ -80,7 +93,7 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
         .from('customers')
         .select(`
           *,
-          loans:loans(id, principal_amount, is_active, interest_rate, interest_type, loan_date, emi_amount)
+          loans:loans(id, principal_amount, is_active, interest_rate, interest_type, loan_date, emi_amount, total_outstanding)
         `)
         .eq('user_id', user?.id)
         .order('name');
@@ -144,9 +157,17 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
   const calculateCustomerOutstanding = (customer: Customer) => {
     const activeLoans = customer.loans?.filter(loan => loan.is_active) || [];
     return activeLoans.reduce((sum, loan) => {
-      const balance = calculateLoanBalance(customer.id, loan.id);
-      const interest = calculateInterest(loan, balance);
-      return sum + balance + interest;
+      // Get initial total outstanding
+      const initialOutstanding = (loan as any).total_outstanding || 0;
+      
+      // Calculate total payments made for this loan
+      const loanPayments = allTransactions.filter(t => t.loan_id === loan.id);
+      const totalPaid = loanPayments.reduce((paymentSum, payment) => paymentSum + payment.amount, 0);
+      
+      // Current outstanding = initial outstanding - total paid
+      const currentOutstanding = initialOutstanding - totalPaid;
+      
+      return sum + Math.max(0, currentOutstanding);
     }, 0);
   };
 

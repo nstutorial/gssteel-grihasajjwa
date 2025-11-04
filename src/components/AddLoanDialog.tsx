@@ -42,6 +42,7 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
   const [formData, setFormData] = useState({
     customerId: '',
     principalAmount: '',
+    processingFee: '',
     description: '',
     interestRate: '',
     interestType: 'none' as 'daily' | 'monthly' | 'none',
@@ -50,6 +51,12 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
     loanDate: new Date().toISOString().split('T')[0],
     dueDate: '',
   });
+
+  const totalOutstanding = formData.principalAmount && formData.processingFee 
+    ? (parseFloat(formData.principalAmount) + parseFloat(formData.processingFee)).toFixed(2)
+    : formData.principalAmount 
+    ? parseFloat(formData.principalAmount).toFixed(2)
+    : '0.00';
 
   useEffect(() => {
     if (user && open) {
@@ -84,12 +91,18 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
 
     setLoading(true);
     try {
+      const processingFeeAmount = formData.processingFee ? parseFloat(formData.processingFee) : 0;
+      const principalAmountValue = parseFloat(formData.principalAmount);
+      const totalOutstandingValue = principalAmountValue + processingFeeAmount;
+      
       const { error } = await supabase
         .from('loans')
         .insert({
           user_id: user.id,
           customer_id: formData.customerId,
-          principal_amount: parseFloat(formData.principalAmount),
+          principal_amount: principalAmountValue,
+          processing_fee: processingFeeAmount,
+          total_outstanding: totalOutstandingValue,
           description: formData.description,
           interest_rate: formData.interestType === 'none' ? 0 : parseFloat(formData.interestRate),
           interest_type: formData.interestType,
@@ -109,6 +122,7 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
       setFormData({
         customerId: '',
         principalAmount: '',
+        processingFee: '',
         description: '',
         interestRate: '',
         interestType: 'none',
@@ -173,6 +187,29 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
               value={formData.principalAmount}
               onChange={(e) => setFormData({ ...formData, principalAmount: e.target.value })}
               required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="processing-fee">Advance / Loan Processing Amount (₹)</Label>
+            <Input
+              id="processing-fee"
+              type="number"
+              step="0.01"
+              placeholder="Enter processing fee"
+              value={formData.processingFee}
+              onChange={(e) => setFormData({ ...formData, processingFee: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="total-outstanding">Total Outstanding (₹)</Label>
+            <Input
+              id="total-outstanding"
+              type="text"
+              value={totalOutstanding}
+              disabled
+              className="bg-muted font-semibold"
             />
           </div>
 

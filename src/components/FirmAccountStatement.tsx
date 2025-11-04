@@ -23,6 +23,11 @@ interface Transaction {
   created_at: string;
 }
 
+interface CustomTransactionType {
+  id: string;
+  name: string;
+}
+
 interface FirmAccountStatementProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,6 +46,7 @@ export function FirmAccountStatement({
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [typeSummary, setTypeSummary] = useState<Record<string, { count: number; total: number }>>({});
+  const [customTypes, setCustomTypes] = useState<Record<string, string>>({});
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -52,6 +58,18 @@ export function FirmAccountStatement({
   const fetchTransactions = async () => {
     try {
       setLoading(true);
+      
+      // Fetch custom transaction types first
+      const { data: customTypesData } = await supabase
+        .from('custom_transaction_types')
+        .select('id, name');
+      
+      const customTypesMap: Record<string, string> = {};
+      (customTypesData || []).forEach(ct => {
+        customTypesMap[ct.id] = ct.name;
+      });
+      setCustomTypes(customTypesMap);
+      
       const { data, error } = await supabase
         .from('firm_transactions')
         .select('*')
@@ -66,11 +84,12 @@ export function FirmAccountStatement({
       const summary: Record<string, { count: number; total: number }> = {};
       (data || []).forEach(txn => {
         const type = txn.transaction_sub_type || txn.transaction_type;
-        if (!summary[type]) {
-          summary[type] = { count: 0, total: 0 };
+        const displayType = customTypesMap[type] || type;
+        if (!summary[displayType]) {
+          summary[displayType] = { count: 0, total: 0 };
         }
-        summary[type].count += 1;
-        summary[type].total += txn.amount;
+        summary[displayType].count += 1;
+        summary[displayType].total += txn.amount;
       });
       setTypeSummary(summary);
     } catch (error: any) {
@@ -104,11 +123,19 @@ export function FirmAccountStatement({
     ).join(' ');
   };
 
+  const getDisplayType = (transaction: Transaction) => {
+    const subType = transaction.transaction_sub_type;
+    if (subType && customTypes[subType]) {
+      return customTypes[subType];
+    }
+    const type = subType || transaction.transaction_type;
+    return getTransactionTypeLabel(type);
+  };
+
   // Filter transactions based on search query
   const filteredTransactions = transactions.filter(txn => {
     const query = searchQuery.toLowerCase();
-    const displayType = txn.transaction_sub_type || txn.transaction_type;
-    const typeLabel = getTransactionTypeLabel(displayType).toLowerCase();
+    const typeLabel = getDisplayType(txn).toLowerCase();
     const description = (txn.description || '').toLowerCase();
     const amount = txn.amount.toString();
     const date = format(new Date(txn.transaction_date), 'dd MMM yyyy').toLowerCase();
@@ -118,10 +145,26 @@ export function FirmAccountStatement({
            amount.includes(query) ||
            date.includes(query);
   });
+  
+  // Calculate running balance
+  const transactionsWithBalance = filteredTransactions.map((txn, index) => {
+    let balance = 0;
+    for (let i = filteredTransactions.length - 1; i >= index; i--) {
+      const t = filteredTransactions[i];
+      if (t.transaction_type === 'partner_withdrawal' || 
+          t.transaction_type === 'expense' ||
+          t.transaction_type === 'refund') {
+        balance -= t.amount;
+      } else {
+        balance += t.amount;
+      }
+    }
+    return { ...txn, balance };
+  });
 
   // Pagination logic
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
-  const paginatedTransactions = filteredTransactions.slice(
+  const totalPages = Math.ceil(transactionsWithBalance.length / itemsPerPage);
+  const paginatedTransactions = transactionsWithBalance.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -158,19 +201,19 @@ export function FirmAccountStatement({
       });
 
       // Table data
-      const tableData = filteredTransactions.map(txn => {
-        const displayType = txn.transaction_sub_type || txn.transaction_type;
+      const tableData = transactionsWithBalance.map(txn => {
         return [
           format(new Date(txn.transaction_date), 'dd MMM yyyy'),
-          getTransactionTypeLabel(displayType),
+          getDisplayType(txn),
           txn.description || '-',
-          `₹${txn.amount.toFixed(2)}`
+          `₹${txn.amount.toFixed(2)}`,
+          `₹${txn.balance.toFixed(2)}`
         ];
       });
 
       (doc as any).autoTable({
         startY: summaryY + 5,
-        head: [['Date', 'Type', 'Description', 'Amount']],
+        head: [['Date', 'Type', 'Description', 'Amount', 'Balance']],
         body: tableData,
         theme: 'grid',
         styles: { fontSize: 9 },
@@ -252,18 +295,18 @@ export function FirmAccountStatement({
                       <TableHead>Type</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedTransactions.map((transaction) => {
-                      const displayType = transaction.transaction_sub_type || transaction.transaction_type;
                       return (
                         <TableRow key={transaction.id}>
                           <TableCell>
                             {format(new Date(transaction.transaction_date), 'dd MMM yyyy')}
                           </TableCell>
                           <TableCell>
-                            {getTransactionTypeLabel(displayType)}
+                            {getDisplayType(transaction)}
                           </TableCell>
                           <TableCell className="max-w-md truncate">
                             {transaction.description || '-'}
@@ -281,6 +324,9 @@ export function FirmAccountStatement({
                               ? '-' 
                               : '+'}
                             ₹{transaction.amount.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            ₹{transaction.balance.toFixed(2)}
                           </TableCell>
                         </TableRow>
                       );

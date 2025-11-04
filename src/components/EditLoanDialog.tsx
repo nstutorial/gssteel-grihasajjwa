@@ -25,6 +25,7 @@ interface Loan {
   description?: string;
   is_active: boolean;
   customer_id: string;
+  locked?: boolean;
   customers: {
     name: string;
     phone?: string;
@@ -132,6 +133,15 @@ const EditLoanDialog: React.FC<EditLoanDialogProps> = ({
     e.preventDefault();
     if (!user || !loan) return;
     
+    if (loan.locked) {
+      toast({
+        variant: "destructive",
+        title: "Cannot edit loan",
+        description: "This loan is locked. Unlock it first to edit.",
+      });
+      return;
+    }
+    
     // Check if loan is closed (outstanding balance <= 0)
     const balance = calculateLoanBalance(loan.id);
     const interest = calculateInterest(loan, balance);
@@ -194,6 +204,15 @@ const EditLoanDialog: React.FC<EditLoanDialogProps> = ({
 
   const handleDelete = async () => {
     if (!user || !loan) return;
+    
+    if (loan.locked) {
+      toast({
+        variant: "destructive",
+        title: "Cannot delete loan",
+        description: "This loan is locked. Unlock it first to delete.",
+      });
+      return;
+    }
     
     // Check if loan is closed (outstanding balance <= 0)
     const balance = calculateLoanBalance(loan.id);

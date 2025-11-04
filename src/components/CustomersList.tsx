@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useControl } from '@/contexts/ControlContext';
 import CustomerDetails from './CustomerDetails';
@@ -25,9 +25,12 @@ interface Customer {
   phone: string | null;
   address: string | null;
   payment_day: string | null;
+  locked?: boolean;
   loans?: Array<{
     id: string;
     principal_amount: number;
+    processing_fee?: number;
+    total_outstanding?: number;
     is_active: boolean;
     emi_amount?: number;
   }>;
@@ -76,7 +79,7 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
         .from('customers')
         .select(`
           *,
-          loans (id, principal_amount, is_active, interest_rate, interest_type, loan_date)
+          loans (id, principal_amount, processing_fee, total_outstanding, is_active, interest_rate, interest_type, loan_date, emi_amount)
         `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
@@ -107,10 +110,50 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
     }
   };
 
+  const toggleLock = async (customer: Customer) => {
+    try {
+      const newLockedState = !customer.locked;
+      const { error } = await supabase
+        .from('customers')
+        .update({ locked: newLockedState })
+        .eq('id', customer.id);
+
+      if (error) throw error;
+
+      setCustomers(customers.map(c => 
+        c.id === customer.id ? { ...c, locked: newLockedState } : c
+      ));
+
+      toast({
+        title: newLockedState ? "Customer locked" : "Customer unlocked",
+        description: newLockedState 
+          ? "Customer can no longer be edited or deleted." 
+          : "Customer can now be edited or deleted.",
+      });
+    } catch (error) {
+      console.error('Error toggling lock:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to toggle lock status",
+      });
+    }
+  };
+
   const deleteCustomer = async (id: string) => {
     try {
       // Check if customer has active loans
       const customer = customers.find(c => c.id === id);
+      
+      if (customer?.locked) {
+        toast({
+          variant: "destructive",
+          title: "Cannot delete customer",
+          description: "This customer is locked. Unlock it first to delete.",
+        });
+        return;
+      }
+
       const hasActiveLoans = customer?.loans?.some(loan => loan.is_active);
       
       if (hasActiveLoans) {
@@ -174,7 +217,8 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
   const calculateLoanBalance = (loan: any) => {
     const loanTransactions = allTransactions.filter(t => t.loan_id === loan.id);
     const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
-    return loan.principal_amount - totalPaid;
+    const loanAmount = loan.total_outstanding || loan.principal_amount;
+    return loanAmount - totalPaid;
   };
 
   const calculateInterest = (loan: any, balance: number) => {
@@ -307,6 +351,7 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
       {paginatedCustomers.map((customer) => {
         const activeLoans = customer.loans?.filter(loan => loan.is_active) || [];
         const totalLoaned = customer.loans?.reduce((sum, loan) => sum + Number(loan.principal_amount), 0) || 0;
+        const totalOutstanding = customer.loans?.filter(loan => loan.is_active).reduce((sum, loan) => sum + Number(loan.total_outstanding || loan.principal_amount), 0) || 0;
         const outstandingBalance = calculateCustomerOutstanding(customer);
         const collectedAmount = calculateCustomerCollected(customer);
         const emisPaid = calculateCustomerEMIsPaid(customer);
@@ -344,11 +389,20 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
+                  <Button
+                    variant={customer.locked ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleLock(customer)}
+                    title={customer.locked ? "Unlock customer" : "Lock customer"}
+                  >
+                    {customer.locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                  </Button>
                   {controlSettings.allowEdit && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleEditCustomer(customer)}
+                      disabled={customer.locked}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -359,6 +413,7 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
                       size="sm"
                       onClick={() => deleteCustomer(customer.id)}
                       className="text-destructive hover:text-destructive"
+                      disabled={customer.locked}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -385,10 +440,14 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
 
               {totalLoaned > 0 && (
                 <div className="p-3 bg-muted rounded-lg">
-                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-7 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Total Loaned</p>
                       <p className="font-semibold">₹{totalLoaned.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Outstanding</p>
+                      <p className="font-semibold text-orange-600">₹{totalOutstanding.toFixed(2)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Collected Amount</p>

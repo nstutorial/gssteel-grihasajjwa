@@ -60,6 +60,7 @@ const Reminders = () => {
           id,
           loan_number,
           principal_amount,
+          total_outstanding,
           due_date,
           interest_rate,
           interest_type,
@@ -111,8 +112,8 @@ const Reminders = () => {
           }
         });
 
-        // Calculate outstanding amount
-        const balance = loan.principal_amount - totalPaid;
+        // Calculate outstanding amount (use total_outstanding instead of principal_amount)
+        const balance = (loan.total_outstanding || loan.principal_amount) - totalPaid;
         
         // Calculate interest on balance
         let interest = 0;

@@ -144,7 +144,10 @@ export function SendMoneyDialog({
       
       // Store main category (expense/income) and detailed sub-type
       const dbTransactionType = isSpecificExpenseType || isCustomType ? 'expense' : formData.transaction_type;
-      const transactionSubType = isSpecificExpenseType || isCustomType ? formData.transaction_type : null;
+      // For custom types, store just the UUID, not "custom_uuid"
+      const transactionSubType = isCustomType 
+        ? formData.transaction_type.replace('custom_', '') 
+        : (isSpecificExpenseType ? formData.transaction_type : null);
 
       const transactionTypeLabel = getTransactionTypeLabel(formData.transaction_type);
       const recipientName = formData.recipient_type === 'partner' 

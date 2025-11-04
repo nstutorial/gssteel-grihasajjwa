@@ -25,6 +25,8 @@ interface Loan {
   id: string;
   loan_number: string;
   principal_amount: number;
+  processing_fee?: number;
+  total_outstanding?: number;
   interest_rate: number | null;
   interest_type: string | null;
   loan_date: string;
@@ -141,11 +143,12 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
                        (!endDate || loanDate <= new Date(endDate));
 
       if (isInRange) {
+        const loanAmount = loan.total_outstanding || loan.principal_amount;
         allEntries.push({
           date: loan.loan_date,
-           description: `Loan - ${loan.description}`,
+           description: `Loan - ${loan.description}${loan.processing_fee ? ` (Inc. Processing Fee: ₹${loan.processing_fee.toFixed(2)})` : ''}`,
           reference: loan.loan_number,
-          debit: loan.principal_amount,
+          debit: loanAmount,
           credit: 0,
           balance: 0, // Will be calculated after sorting
           type: 'loan_disbursement'
@@ -191,11 +194,22 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
   };
 
   const calculateLoanBalance = (loanId: string) => {
-    const loanTransactions = transactions.filter(t => t.loan_id === loanId);
-    const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const loan = loans.find(l => l.id === loanId);
-    return loan ? loan.principal_amount - totalPaid : 0;
-  };
+  const loan = loans.find(l => l.id === loanId);
+  if (!loan) return 0;
+
+  const loanTransactions = transactions.filter(t => t.loan_id === loanId);
+  const totalCollected = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+  // Total disbursed = principal + processing fee (if exists)
+  const totalDisbursed = (loan.total_outstanding ?? 0) > 0
+    ? loan.total_outstanding
+    : loan.principal_amount + (loan.processing_fee || 0);
+
+  const remaining = totalDisbursed - totalCollected;
+  return remaining > 0 ? remaining : 0; // prevent negative balances
+};
+
+
 
   const calculateInterest = (loan: Loan, balance: number) => {
     if (!loan.interest_rate || loan.interest_type === 'none') return 0;

@@ -12,6 +12,7 @@ interface Transaction {
   notes: string | null;
   mahajan_name: string;
   source?: 'partner' | 'firm';
+  balance?: number;
 }
 
 interface PartnerStatementProps {
@@ -33,6 +34,7 @@ export function PartnerStatement({ transactions, onEdit, onDelete }: PartnerStat
             <TableHead>Mahajan</TableHead>
             <TableHead>Payment Mode</TableHead>
             <TableHead className="text-right">Amount</TableHead>
+            <TableHead className="text-right">Balance</TableHead>
             <TableHead>Notes</TableHead>
             {showActions && <TableHead className="text-right">Actions</TableHead>}
           </TableRow>
@@ -40,7 +42,7 @@ export function PartnerStatement({ transactions, onEdit, onDelete }: PartnerStat
         <TableBody>
           {transactions.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={showActions ? 6 : 5} className="text-center text-muted-foreground">
+              <TableCell colSpan={showActions ? 7 : 6} className="text-center text-muted-foreground">
                 No transactions found
               </TableCell>
             </TableRow>
@@ -54,6 +56,9 @@ export function PartnerStatement({ transactions, onEdit, onDelete }: PartnerStat
                   transaction.amount < 0 ? 'text-destructive' : 'text-green-600'
                 }`}>
                   {transaction.amount < 0 ? '-' : '+'}₹{Math.abs(transaction.amount).toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right font-medium">
+                  ₹{(transaction.balance || 0).toFixed(2)}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {transaction.notes || '-'}

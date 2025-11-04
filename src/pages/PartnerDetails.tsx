@@ -28,6 +28,7 @@ interface Transaction {
   notes: string | null;
   mahajan_name: string;
   source?: 'partner' | 'firm';
+  balance?: number;
 }
 
 export default function PartnerDetails() {
@@ -162,7 +163,7 @@ const fetchTransactions = async () => {
     const formattedFirmTxns = (firmTxns || []).map(t => {
       let adjustedAmount = 0;
 
-      // Logic for handling partner’s balance
+      // Logic for handling partner's balance
       if (t.transaction_type === 'partner_deposit') {
         // Money added to firm, deducted from partner
         adjustedAmount = t.amount;
@@ -191,18 +192,28 @@ const fetchTransactions = async () => {
       };
     });
 
-    // ✅ Merge and sort both sets
-    const allTransactions = [...formattedPartnerTxns, ...formattedFirmTxns].sort(
-      (a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
+    // ✅ Merge and sort both sets (oldest first for balance calculation)
+    const allTransactionsSorted = [...formattedPartnerTxns, ...formattedFirmTxns].sort(
+      (a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
     );
+
+    // ✅ Calculate running balance
+    let runningBalance = 0;
+    const transactionsWithBalance = allTransactionsSorted.map(txn => {
+      runningBalance += txn.amount;
+      return { ...txn, balance: runningBalance };
+    });
+
+    // ✅ Reverse to show newest first in UI
+    const allTransactions = [...transactionsWithBalance].reverse();
 
     // ✅ Set transactions for UI
     setTransactions(allTransactions);
 
     // ✅ Calculate total investment for this partner
-    const calculatedTotal = allTransactions.reduce((sum, txn) => sum + txn.amount, 0);
+    const calculatedTotal = runningBalance;
 
-    // ✅ Update partner’s total investment dynamically
+    // ✅ Update partner's total investment dynamically
     setPartner(prev => (prev ? { ...prev, total_invested: calculatedTotal } : prev));
   } catch (error: any) {
     console.error('Error fetching transactions:', error);

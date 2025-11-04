@@ -36,6 +36,8 @@ interface Customer {
 interface Loan {
   id: string;
   principal_amount: number;
+  processing_fee?: number;
+  total_outstanding?: number;
   interest_rate: number | null;
   interest_type: string | null;
   loan_date: string;
@@ -151,6 +153,9 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
         description: "The payment has been successfully recorded.",
       });
 
+      // Dispatch event to refresh daywise payment schedule
+      window.dispatchEvent(new CustomEvent('payment-recorded'));
+
       setPaymentData({
         amount: '',
         paymentType: 'principal',
@@ -176,7 +181,8 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
   const calculateLoanBalance = (loan: Loan) => {
     const loanTransactions = transactions.filter(t => t.loan_id === loan.id);
     const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
-    return loan.principal_amount - totalPaid;
+    const initialOutstanding = loan.total_outstanding || loan.principal_amount;
+    return initialOutstanding - totalPaid;
   };
 
   const calculateInterest = (loan: Loan, balance: number) => {
@@ -279,6 +285,16 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
                       <Badge variant="secondary">
                         {formatCurrency(loan.principal_amount)}
                       </Badge>
+                      {loan.processing_fee && loan.processing_fee > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Processing Fee: {formatCurrency(loan.processing_fee)}
+                        </p>
+                      )}
+                      {loan.total_outstanding && (
+                        <p className="text-sm font-semibold text-orange-600 mt-1">
+                          Total Outstanding: {formatCurrency(loan.total_outstanding)}
+                        </p>
+                      )}
                       <p className="text-sm text-muted-foreground mt-1">
                         Balance: {formatCurrency(balance)}
                       </p>

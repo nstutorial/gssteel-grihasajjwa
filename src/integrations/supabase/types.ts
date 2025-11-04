@@ -475,6 +475,8 @@ export type Database = {
           loan_date: string
           loan_number: string | null
           principal_amount: number
+          processing_fee: number | null
+          total_outstanding: number | null
           updated_at: string
           user_id: string
         }
@@ -492,6 +494,8 @@ export type Database = {
           loan_date?: string
           loan_number?: string | null
           principal_amount: number
+          processing_fee?: number | null
+          total_outstanding?: number | null
           updated_at?: string
           user_id: string
         }
@@ -509,6 +513,8 @@ export type Database = {
           loan_date?: string
           loan_number?: string | null
           principal_amount?: number
+          processing_fee?: number | null
+          total_outstanding?: number | null
           updated_at?: string
           user_id?: string
         }

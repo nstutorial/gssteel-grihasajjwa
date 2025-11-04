@@ -27,6 +27,7 @@ import SalesReport from "./pages/reports/SalesReport";
 import ActiveLoansReport from "./pages/reports/ActiveLoansReport";
 import NotFound from "./pages/NotFound";
 
+
 const queryClient = new QueryClient();
 
 // Protected Route Component

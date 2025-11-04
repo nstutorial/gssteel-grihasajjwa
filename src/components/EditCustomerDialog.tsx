@@ -17,6 +17,7 @@ interface Customer {
   phone: string | null;
   address: string | null;
   payment_day: string | null;
+  locked?: boolean;
 }
 
 interface EditCustomerDialogProps {
@@ -59,6 +60,15 @@ const EditCustomerDialog: React.FC<EditCustomerDialogProps> = ({
     e.preventDefault();
     if (!user || !customer) return;
 
+    if (customer.locked) {
+      toast({
+        variant: "destructive",
+        title: "Cannot edit customer",
+        description: "This customer is locked. Unlock it first to edit.",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase
@@ -97,6 +107,15 @@ const EditCustomerDialog: React.FC<EditCustomerDialogProps> = ({
   const handleDelete = async () => {
     if (!user || !customer) return;
     
+    if (customer.locked) {
+      toast({
+        variant: "destructive",
+        title: "Cannot delete customer",
+        description: "This customer is locked. Unlock it first to delete.",
+      });
+      return;
+    }
+
     try {
       // Check if customer has active loans or transactions
       const { data: loanData } = await supabase
