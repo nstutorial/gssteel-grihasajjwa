@@ -209,7 +209,7 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="other-fees">Other Fees (₹) *</Label>
+            <Label htmlFor="other-fees">Other Fees(12.5%) (₹) *</Label>
             <Input
               id="other-fees"
               type="number"
@@ -321,6 +321,7 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
               placeholder="Enter EMI amount"
               value={formData.emiAmount}
               onChange={(e) => setFormData({ ...formData, emiAmount: e.target.value })}
+              required
             />
           </div>
 
