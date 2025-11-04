@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
+import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useControl } from '@/contexts/ControlContext';
 import CustomerDetails from './CustomerDetails';
@@ -110,32 +110,38 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
     }
   };
 
-  const toggleLock = async (customer: Customer) => {
+  const handleLock = async (customer: Customer) => {
+    if (customer.locked) {
+      toast({
+        variant: "destructive",
+        title: "Already locked",
+        description: "To unlock this customer, go to Settings page.",
+      });
+      return;
+    }
+
     try {
-      const newLockedState = !customer.locked;
       const { error } = await supabase
         .from('customers')
-        .update({ locked: newLockedState })
+        .update({ locked: true })
         .eq('id', customer.id);
 
       if (error) throw error;
 
       setCustomers(customers.map(c => 
-        c.id === customer.id ? { ...c, locked: newLockedState } : c
+        c.id === customer.id ? { ...c, locked: true } : c
       ));
 
       toast({
-        title: newLockedState ? "Customer locked" : "Customer unlocked",
-        description: newLockedState 
-          ? "Customer can no longer be edited or deleted." 
-          : "Customer can now be edited or deleted.",
+        title: "Customer locked",
+        description: "Customer can no longer be edited or deleted. Go to Settings to unlock.",
       });
     } catch (error) {
-      console.error('Error toggling lock:', error);
+      console.error('Error locking customer:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to toggle lock status",
+        description: "Failed to lock customer",
       });
     }
   };
@@ -392,10 +398,10 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
                   <Button
                     variant={customer.locked ? "default" : "outline"}
                     size="sm"
-                    onClick={() => toggleLock(customer)}
-                    title={customer.locked ? "Unlock customer" : "Lock customer"}
+                    onClick={() => handleLock(customer)}
+                    title={customer.locked ? "Locked - Unlock from Settings" : "Lock customer"}
                   >
-                    {customer.locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                    <Lock className="h-4 w-4" />
                   </Button>
                   {controlSettings.allowEdit && (
                     <Button

@@ -7,10 +7,11 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Settings as SettingsIcon, Mail, Edit3, Shield, Lock, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Settings as SettingsIcon, Mail, Edit3, Shield, Lock, BarChart3, Unlock } from 'lucide-react';
 import { useControl } from '@/contexts/ControlContext';
 import { CustomTransactionTypeContent } from '@/components/CustomTransactionTypeContent';
 
@@ -76,11 +77,15 @@ const Settings = () => {
   const [enteredPassword, setEnteredPassword] = useState('');
   const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
   const [userRole, setUserRole] = useState<string>('employee');
+  const [lockedCustomers, setLockedCustomers] = useState<any[]>([]);
+  const [lockedLoans, setLockedLoans] = useState<any[]>([]);
+  const [isLoadingLocked, setIsLoadingLocked] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchSettings();
       fetchUserRole();
+      fetchLockedItems();
       // Check if password was already verified in this session
       const sessionPasswordVerified = sessionStorage.getItem('settingsPasswordVerified');
       if (sessionPasswordVerified === 'true') {
@@ -232,6 +237,92 @@ const Settings = () => {
   const handlePasswordKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       verifyPassword();
+    }
+  };
+
+  const fetchLockedItems = async () => {
+    if (!user) return;
+    
+    setIsLoadingLocked(true);
+    try {
+      // Fetch locked customers
+      const { data: customers, error: customersError } = await supabase
+        .from('customers')
+        .select('id, name, phone')
+        .eq('user_id', user.id)
+        .eq('locked', true);
+
+      if (customersError) throw customersError;
+      setLockedCustomers(customers || []);
+
+      // Fetch locked loans with customer info
+      const { data: loans, error: loansError } = await supabase
+        .from('loans')
+        .select('id, loan_number, principal_amount, customer_id, customers(name)')
+        .eq('user_id', user.id)
+        .eq('locked', true);
+
+      if (loansError) throw loansError;
+      setLockedLoans(loans || []);
+    } catch (error) {
+      console.error('Error fetching locked items:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load locked items',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingLocked(false);
+    }
+  };
+
+  const handleUnlockCustomer = async (customerId: string) => {
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({ locked: false })
+        .eq('id', customerId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Customer unlocked',
+        description: 'Customer can now be edited or deleted.',
+      });
+
+      await fetchLockedItems();
+    } catch (error) {
+      console.error('Error unlocking customer:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to unlock customer',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleUnlockLoan = async (loanId: string) => {
+    try {
+      const { error } = await supabase
+        .from('loans')
+        .update({ locked: false })
+        .eq('id', loanId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Loan unlocked',
+        description: 'Loan can now be edited or deleted.',
+      });
+
+      await fetchLockedItems();
+    } catch (error) {
+      console.error('Error unlocking loan:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to unlock loan',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -995,6 +1086,87 @@ const Settings = () => {
                   </div>
                 ))}
               </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Locked Items Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                Locked Items Management
+              </CardTitle>
+              <CardDescription>
+                Unlock customers and loans that have been locked
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Locked Customers */}
+                <div>
+                  <h3 className="text-sm font-medium mb-3">Locked Customers</h3>
+                  {isLoadingLocked ? (
+                    <p className="text-sm text-muted-foreground">Loading...</p>
+                  ) : lockedCustomers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No locked customers</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {lockedCustomers.map((customer) => (
+                        <div key={customer.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="font-medium">{customer.name}</p>
+                            {customer.phone && (
+                              <p className="text-sm text-muted-foreground">{customer.phone}</p>
+                            )}
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnlockCustomer(customer.id)}
+                          >
+                            <Unlock className="h-4 w-4 mr-2" />
+                            Unlock
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Locked Loans */}
+                <div className="pt-4 border-t">
+                  <h3 className="text-sm font-medium mb-3">Locked Loans</h3>
+                  {isLoadingLocked ? (
+                    <p className="text-sm text-muted-foreground">Loading...</p>
+                  ) : lockedLoans.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No locked loans</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {lockedLoans.map((loan) => (
+                        <div key={loan.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">Loan #{loan.loan_number}</p>
+                              <Badge variant="outline">₹{loan.principal_amount.toFixed(2)}</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Customer: {loan.customers?.name}
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnlockLoan(loan.id)}
+                          >
+                            <Unlock className="h-4 w-4 mr-2" />
+                            Unlock
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
