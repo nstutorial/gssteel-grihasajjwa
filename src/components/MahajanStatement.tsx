@@ -55,6 +55,18 @@ interface FirmTransaction {
   description: string | null;
 }
 
+interface PartnerTransaction {
+  id: string;
+  amount: number;
+  payment_date: string;
+  payment_mode: string;
+  notes: string | null;
+  partner_id: string;
+  partners: {
+    name: string;
+  } | null;
+}
+
 interface StatementEntry {
   date: string;
   description: string;
@@ -62,7 +74,7 @@ interface StatementEntry {
   debit: number;
   credit: number;
   balance: number;
-  type: 'bill_disbursement' | 'payment_paid' | 'interest_accrued' | 'firm_payment';
+  type: 'bill_disbursement' | 'payment_paid' | 'interest_accrued' | 'firm_payment' | 'partner_payment';
 }
 
 interface MahajanStatementProps {
@@ -75,6 +87,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
   const [bills, setBills] = useState<Bill[]>([]);
   const [transactions, setTransactions] = useState<BillTransaction[]>([]);
   const [firmTransactions, setFirmTransactions] = useState<FirmTransaction[]>([]);
+  const [partnerTransactions, setPartnerTransactions] = useState<PartnerTransaction[]>([]);
   const [statement, setStatement] = useState<StatementEntry[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -87,10 +100,10 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
   }, [user, mahajan.id]);
 
   useEffect(() => {
-    if (bills.length > 0 || firmTransactions.length > 0) {
+    if (bills.length > 0 || firmTransactions.length > 0 || partnerTransactions.length > 0) {
       generateStatement();
     }
-  }, [bills, transactions, firmTransactions, startDate, endDate]);
+  }, [bills, transactions, firmTransactions, partnerTransactions, startDate, endDate]);
 
   // Realtime subscriptions for partner transaction updates
   useEffect(() => {
@@ -156,6 +169,18 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
 
       if (firmTransError) throw firmTransError;
 
+      // Fetch partner transactions for this mahajan
+      const { data: partnerTransData, error: partnerTransError } = await supabase
+        .from('partner_transactions')
+        .select(`
+          *,
+          partners(name)
+        `)
+        .eq('mahajan_id', mahajan.id)
+        .order('payment_date', { ascending: true });
+
+      if (partnerTransError) throw partnerTransError;
+
       let transactionsData: BillTransaction[] = [];
 
       // Fetch transactions (only if there are bills)
@@ -177,6 +202,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       setTransactions(transactionsData);
       setBills(billsData || []);
       setFirmTransactions(firmTransData || []);
+      setPartnerTransactions(partnerTransData || []);
 
     } catch (error) {
       console.error('Error fetching mahajan data:', error);
@@ -298,6 +324,26 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       }
     });
 
+    // Add partner transactions
+    partnerTransactions.forEach(partnerTrans => {
+      const transDate = new Date(partnerTrans.payment_date);
+      const isInRange = (!startDate || transDate >= new Date(startDate)) && 
+                       (!endDate || transDate <= new Date(endDate));
+
+      if (isInRange) {
+        const partnerName = partnerTrans.partners?.name || 'Unknown Partner';
+        allEntries.push({
+          date: partnerTrans.payment_date,
+          description: `Partner Payment from ${partnerName}${partnerTrans.notes ? ' - ' + partnerTrans.notes : ''}`,
+          reference: 'PARTNER',
+          debit: 0,
+          credit: partnerTrans.amount,
+          balance: 0, // Will be calculated after sorting
+          type: 'partner_payment'
+        });
+      }
+    });
+
     // Sort by date in ascending order
     allEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -306,7 +352,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       if (entry.type === 'bill_disbursement') {
         entry.balance = runningBalance + entry.debit;
         runningBalance += entry.debit;
-      } else if (entry.type === 'payment_paid' || entry.type === 'firm_payment') {
+      } else if (entry.type === 'payment_paid' || entry.type === 'firm_payment' || entry.type === 'partner_payment') {
         entry.balance = runningBalance - entry.credit;
         runningBalance -= entry.credit;
       }
