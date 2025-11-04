@@ -201,6 +201,7 @@ export type Database = {
           created_at: string
           daily_amount: number | null
           id: string
+          locked: boolean | null
           name: string
           outstanding_amount: number | null
           payment_day: string | null
@@ -213,6 +214,7 @@ export type Database = {
           created_at?: string
           daily_amount?: number | null
           id?: string
+          locked?: boolean | null
           name: string
           outstanding_amount?: number | null
           payment_day?: string | null
@@ -225,6 +227,7 @@ export type Database = {
           created_at?: string
           daily_amount?: number | null
           id?: string
+          locked?: boolean | null
           name?: string
           outstanding_amount?: number | null
           payment_day?: string | null
@@ -474,6 +477,7 @@ export type Database = {
           is_active: boolean | null
           loan_date: string
           loan_number: string | null
+          locked: boolean | null
           principal_amount: number
           processing_fee: number | null
           total_outstanding: number | null
@@ -493,6 +497,7 @@ export type Database = {
           is_active?: boolean | null
           loan_date?: string
           loan_number?: string | null
+          locked?: boolean | null
           principal_amount: number
           processing_fee?: number | null
           total_outstanding?: number | null
@@ -512,6 +517,7 @@ export type Database = {
           is_active?: boolean | null
           loan_date?: string
           loan_number?: string | null
+          locked?: boolean | null
           principal_amount?: number
           processing_fee?: number | null
           total_outstanding?: number | null
