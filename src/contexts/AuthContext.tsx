@@ -88,23 +88,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Attempting signup with:', { email, fullName });
       
-      // First, check if user already exists by trying to sign in
-      const { data: existingUser, error: existingError } = await supabase.auth.signInWithPassword({
-        email,
-        password: 'dummy_password_to_check_existence'
-      });
-
-      // If sign in succeeds or fails with "Invalid login credentials", user exists
-      if (existingUser || (existingError && existingError.message.includes('Invalid login credentials'))) {
-        toast({
-          variant: "destructive",
-          title: "Already Registered",
-          description: "This email address is already registered. Please try signing in instead.",
-        });
-        return { error: { message: 'User already exists' } };
-      }
-
-      // If it's a different error (like network issue), proceed with signup
       const redirectUrl = `${window.location.origin}/`;
       
       const { data, error } = await supabase.auth.signUp({
@@ -152,6 +135,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             description: error.message,
           });
         }
+      } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+        // This means the user already exists (Supabase returns user but with empty identities array)
+        console.log('User already exists');
+        toast({
+          variant: "destructive",
+          title: "Already Registered",
+          description: "This email address is already registered. Please try signing in instead.",
+        });
+        return { error: { message: 'User already exists' } };
       } else {
         console.log('Signup successful, user:', data.user);
         toast({
