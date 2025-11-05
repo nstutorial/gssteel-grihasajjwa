@@ -547,28 +547,17 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
             <div className="text-2xl font-bold">{bills.filter(b => b.is_active).length}</div>
           </CardContent>
         </Card>
-        {calculateTotalOutstanding() >= 0 ? (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{formatCurrency(calculateTotalOutstanding())}</div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Advance Payment</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600">{formatCurrency(Math.abs(calculateTotalOutstanding()))}</div>
-            </CardContent>
-          </Card>
-        )}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Advance Payment (Direct)</CardTitle>
+            <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{formatCurrency(calculateTotalOutstanding())}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Advance Payment</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{formatCurrency(mahajanData.advance_payment || 0)}</div>
