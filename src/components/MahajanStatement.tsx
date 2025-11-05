@@ -652,12 +652,21 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
               </div>
               <div className="text-sm text-green-600">Total Credits</div>
             </div>
-            <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">
-                {formatCurrency(calculateStatementOutstanding())}
+            {calculateStatementOutstanding() >= 0 ? (
+              <div className="text-center p-4 bg-orange-50 rounded-lg">
+                <div className="text-2xl font-bold text-orange-600">
+                  {formatCurrency(calculateStatementOutstanding())}
+                </div>
+                <div className="text-sm text-orange-600">Outstanding Balance</div>
               </div>
-              <div className="text-sm text-orange-600">Outstanding Balance</div>
-            </div>
+            ) : (
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {formatCurrency(Math.abs(calculateStatementOutstanding()))}
+                </div>
+                <div className="text-sm text-purple-600">Advance Payment</div>
+              </div>
+            )}
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">{statement.length}</div>
               <div className="text-sm text-blue-600">Total Entries</div>
