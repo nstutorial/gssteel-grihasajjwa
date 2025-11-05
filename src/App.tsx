@@ -20,6 +20,7 @@ import Partners from "./pages/Partners";
 import PartnerDetails from "./pages/PartnerDetails";
 import FirmAccounts from "./pages/FirmAccounts";
 import FirmAccountDetails from "./pages/FirmAccountDetails";
+import FirmAccountTransactionTypeDetails from "./pages/FirmAccountTransactionTypeDetails";
 import TransactionTypes from "./pages/TransactionTypes";
 import CollectionReport from "./pages/reports/CollectionReport";
 import DisbursedReport from "./pages/reports/DisbursedReport";
@@ -148,6 +149,11 @@ const AppRoutes = () => {
       <Route path="/firm-accounts/:id" element={
         <ProtectedRoute>
           <FirmAccountDetails />
+        </ProtectedRoute>
+      } />
+      <Route path="/firm-accounts/:id/type-details" element={
+        <ProtectedRoute>
+          <FirmAccountTransactionTypeDetails />
         </ProtectedRoute>
       } />
       <Route path="/transaction-types" element={

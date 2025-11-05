@@ -559,7 +559,11 @@ export default function FirmAccountDetails() {
       {Object.keys(typeSummary).length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
           {Object.entries(typeSummary).map(([type, data]) => (
-            <Card key={type}>
+            <Card 
+              key={type}
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => navigate(`/firm-accounts/${id}/type-details?type=${type}`)}
+            >
               <CardContent className="pt-6">
                 <div className="text-sm text-muted-foreground mb-1">
                   {getTransactionTypeLabel(type)}
