@@ -266,14 +266,14 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         .filter(b => b.is_active)
         .sort((a, b) => new Date(a.bill_date).getTime() - new Date(b.bill_date).getTime());
 
-      if (activeBills.length === 0) {
-        toast({
-          variant: 'destructive',
-          title: 'No Active Bills',
-          description: 'There are no active bills to pay',
-        });
-        return;
-      }
+      // if (activeBills.length === 0) {
+      //   toast({
+      //     variant: 'destructive',
+      //     title: 'No Active Bills',
+      //     description: 'There are no active bills to pay',
+      //   });
+      //   return;
+      // }
 
       let remainingPayment = paymentAmount;
       const transactionsToInsert: any[] = [];
