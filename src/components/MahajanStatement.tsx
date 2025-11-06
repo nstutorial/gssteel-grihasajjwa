@@ -19,6 +19,7 @@ interface Mahajan {
   phone: string | null;
   address: string | null;
   payment_day: string | null;
+  advance_payment?: number;
 }
 
 interface Bill {
@@ -222,6 +223,19 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
 
     // Collect all entries first
     const allEntries: StatementEntry[] = [];
+
+    // Add advance payment as opening credit if exists
+    if (mahajan.advance_payment && mahajan.advance_payment > 0) {
+      allEntries.push({
+        date: new Date().toISOString().split('T')[0], // Use current date
+        description: 'Advance Payment Received',
+        reference: 'ADV',
+        debit: 0,
+        credit: mahajan.advance_payment,
+        balance: 0, // Will be calculated after sorting
+        type: 'partner_payment'
+      });
+    }
 
     // Add bill disbursements
     bills.forEach(bill => {

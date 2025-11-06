@@ -336,20 +336,6 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
         if (advanceError) throw advanceError;
 
-        // Create a partner_transaction to track this advance payment in the statement
-        const { error: partnerTxError } = await supabase
-          .from('partner_transactions')
-          .insert({
-            partner_id: null,
-            mahajan_id: mahajan.id,
-            amount: remainingPayment,
-            payment_date: paymentData.payment_date,
-            payment_mode: paymentData.payment_mode,
-            notes: `Advance payment received${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
-          });
-
-        if (partnerTxError) throw partnerTxError;
-
         toast({
           title: 'Payment recorded',
           description: `Payment of ${formatCurrency(paymentAmount)} recorded. ${formatCurrency(remainingPayment)} added as advance payment.`,
