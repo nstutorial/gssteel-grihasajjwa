@@ -254,64 +254,35 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       }
     });
 
-    // Group transactions by date and payment mode
-    const transactionsByDate = new Map<string, BillTransaction[]>();
-    
-    transactions.forEach(transaction => {
-      const paymentDate = new Date(transaction.payment_date);
+    // Add each bill transaction as its own entry (no grouping)
+    transactions.forEach(t => {
+      const paymentDate = new Date(t.payment_date);
       const isInRange = (!startDate || paymentDate >= new Date(startDate)) && 
                        (!endDate || paymentDate <= new Date(endDate));
 
-      if (isInRange) {
-        const key = `${transaction.payment_date}-${transaction.transaction_type}-${transaction.payment_mode}`;
-        if (!transactionsByDate.has(key)) {
-          transactionsByDate.set(key, []);
-        }
-        transactionsByDate.get(key)!.push(transaction);
-      }
-    });
+      if (!isInRange) return;
 
-    // Create consolidated payment entries
-    transactionsByDate.forEach((groupedTransactions, key) => {
-      const firstTransaction = groupedTransactions[0];
-      const totalAmount = groupedTransactions.reduce((sum, t) => sum + t.amount, 0);
-      
       // Extract reference number from notes
-      let referenceNumber = '';
-      if (firstTransaction.notes) {
-        const refMatch = firstTransaction.notes.match(/REF#(\d{8})/);
+      let referenceNumber = 'N/A';
+      if (t.notes) {
+        const refMatch = t.notes.match(/REF#(\d{8})/);
         if (refMatch) {
           referenceNumber = refMatch[1];
         }
       }
-      
-      // Build description with all bill details
-      let description = `Payment Received`;
-      
-      // Extract partner info if present
-      let partnerInfo = '';
-      if (firstTransaction.notes && firstTransaction.notes.includes('Payment from partner:')) {
-        const partnerMatch = firstTransaction.notes.match(/Payment from partner: ([^-]+)/);
-        if (partnerMatch) {
-          partnerInfo = ` from ${partnerMatch[1].trim()}`;
-        }
-      }
-      
-      description += partnerInfo;
-      
-      // Add bill details
-      const billDetails = groupedTransactions.map(t => 
-        `₹${t.amount.toFixed(2)} for payment of ${t.bill.bill_number}`
-      ).join('\n');
-      
-      description += '\n' + billDetails;
+
+      const typeLabel = t.transaction_type === 'interest' ? 'Interest' : 'Principal';
+      const descriptionParts = [
+        `Payment Received - ${typeLabel} for ${t.bill.bill_number}`,
+        t.notes ? `Notes: ${t.notes}` : ''
+      ].filter(Boolean);
 
       allEntries.push({
-        date: firstTransaction.payment_date,
-        description: description,
-        reference: referenceNumber || 'N/A',
+        date: t.payment_date,
+        description: descriptionParts.join('\n'),
+        reference: referenceNumber,
         debit: 0,
-        credit: totalAmount,
+        credit: t.amount,
         balance: 0, // Will be calculated after sorting
         type: 'payment_paid'
       });
