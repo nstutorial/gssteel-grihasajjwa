@@ -98,10 +98,35 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
     payment_mode: 'cash' as 'cash' | 'bank',
   });
 
+  const [firmAccounts, setFirmAccounts] = useState<any[]>([]);
+  const [selectedFirmAccount, setSelectedFirmAccount] = useState<string>('');
+
   // Fetch bills and transactions together to prevent flickering
   useEffect(() => {
-    if (user) fetchBillsAndTransactions();
+    if (user) {
+      fetchBillsAndTransactions();
+      fetchFirmAccounts();
+    }
   }, [user, mahajan.id]);
+
+  const fetchFirmAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('firm_accounts')
+        .select('*')
+        .eq('user_id', user?.id)
+        .eq('is_active', true)
+        .order('account_name');
+
+      if (error) throw error;
+      setFirmAccounts(data || []);
+      if (data && data.length > 0) {
+        setSelectedFirmAccount(data[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching firm accounts:', error);
+    }
+  };
 
   // Listen for refresh events (when bills/transactions are edited)
   useEffect(() => {
@@ -326,15 +351,43 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         if (error) throw error;
       }
 
-      // If there's remaining payment (overpayment or no bills), store it as advance
+      // If there's remaining payment (overpayment or no bills), store it as advance transaction
       if (remainingPayment > 0) {
-        const currentAdvance = mahajanData.advance_payment || 0;
-        const { error: advanceError } = await supabase
-          .from('mahajans')
-          .update({ advance_payment: currentAdvance + remainingPayment })
-          .eq('id', mahajan.id);
+        if (!selectedFirmAccount) {
+          toast({
+            variant: 'destructive',
+            title: 'No Firm Account',
+            description: 'Please select a firm account to record advance payment',
+          });
+          setLoading(false);
+          return;
+        }
 
-        if (advanceError) throw advanceError;
+        // Create firm transaction for advance payment
+        const { error: firmTxError } = await supabase
+          .from('firm_transactions')
+          .insert({
+            firm_account_id: selectedFirmAccount,
+            mahajan_id: mahajan.id,
+            amount: remainingPayment,
+            transaction_type: 'receive',
+            transaction_sub_type: 'advance_payment',
+            transaction_date: paymentData.payment_date,
+            description: `Advance Payment Received${paymentData.notes ? ' - ' + paymentData.notes : ''} (REF#${referenceNumber})`
+          });
+
+        if (firmTxError) throw firmTxError;
+
+        // Update firm account balance
+        const firmAccount = firmAccounts.find(fa => fa.id === selectedFirmAccount);
+        if (firmAccount) {
+          const { error: balanceError } = await supabase
+            .from('firm_accounts')
+            .update({ current_balance: firmAccount.current_balance + remainingPayment })
+            .eq('id', selectedFirmAccount);
+
+          if (balanceError) throw balanceError;
+        }
 
         toast({
           title: 'Payment recorded',
@@ -730,6 +783,26 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
                   <SelectItem value="bank">Bank</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Firm Account</Label>
+              <Select 
+                value={selectedFirmAccount} 
+                onValueChange={setSelectedFirmAccount}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {firmAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.account_name} ({account.account_type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">For recording advance payments</p>
             </div>
 
             <div className="space-y-2">

@@ -53,7 +53,11 @@ interface FirmTransaction {
   amount: number;
   transaction_date: string;
   transaction_type: string;
+  transaction_sub_type: string | null;
   description: string | null;
+  firm_accounts?: {
+    account_name: string;
+  } | null;
 }
 
 interface PartnerTransaction {
@@ -288,20 +292,36 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       });
     });
 
-    // Add firm transactions
-    firmTransactions.forEach(firmTrans => {
-      const transDate = new Date(firmTrans.transaction_date);
-      const isInRange = (!startDate || transDate >= new Date(startDate)) && 
-                       (!endDate || transDate <= new Date(endDate));
+    // Add firm transactions as payments received
+    firmTransactions.forEach(ft => {
+      const transactionDate = new Date(ft.transaction_date);
+      const isInRange = (!startDate || transactionDate >= new Date(startDate)) && 
+                       (!endDate || transactionDate <= new Date(endDate));
 
       if (isInRange) {
+        // Extract reference number from description if exists
+        let referenceNumber = 'FIRM';
+        if (ft.description) {
+          const refMatch = ft.description.match(/REF#(\d{8})/);
+          if (refMatch) {
+            referenceNumber = refMatch[1];
+          }
+        }
+
+        const accountName = ft.firm_accounts?.account_name || 'Firm Account';
+        const typeLabel = ft.transaction_sub_type === 'advance_payment' ? 'Advance Payment' : ft.transaction_type;
+        const descriptionParts = [
+          `${typeLabel} Received via ${accountName}`,
+          ft.description || ''
+        ].filter(Boolean);
+        
         allEntries.push({
-          date: firmTrans.transaction_date,
-          description: `Firm Payment - ${firmTrans.description || 'Payment from firm account'}`,
-          reference: 'FIRM',
+          date: ft.transaction_date,
+          description: descriptionParts.join('\n'),
+          reference: referenceNumber,
           debit: 0,
-          credit: firmTrans.amount,
-          balance: 0, // Will be calculated after sorting
+          credit: ft.amount,
+          balance: 0,
           type: 'firm_payment'
         });
       }
