@@ -317,14 +317,16 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         }
       }
 
-      // Insert all transactions
-      const { error } = await supabase
-        .from('bill_transactions')
-        .insert(transactionsToInsert);
+      // Insert all transactions if any
+      if (transactionsToInsert.length > 0) {
+        const { error } = await supabase
+          .from('bill_transactions')
+          .insert(transactionsToInsert);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
-      // If there's remaining payment (overpayment), store it as advance
+      // If there's remaining payment (overpayment or no bills), store it as advance
       if (remainingPayment > 0) {
         const currentAdvance = mahajanData.advance_payment || 0;
         const { error: advanceError } = await supabase
@@ -333,6 +335,20 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
           .eq('id', mahajan.id);
 
         if (advanceError) throw advanceError;
+
+        // Create a partner_transaction to track this advance payment in the statement
+        const { error: partnerTxError } = await supabase
+          .from('partner_transactions')
+          .insert({
+            partner_id: null,
+            mahajan_id: mahajan.id,
+            amount: remainingPayment,
+            payment_date: paymentData.payment_date,
+            payment_mode: paymentData.payment_mode,
+            notes: `Advance payment received${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
+          });
+
+        if (partnerTxError) throw partnerTxError;
 
         toast({
           title: 'Payment recorded',
