@@ -661,7 +661,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         </TabsContent>
 
         <TabsContent value="statement">
-          <MahajanStatement mahajan={mahajan} />
+          <MahajanStatement mahajan={mahajanData} />
         </TabsContent>
 
         <TabsContent value="searchBill">
