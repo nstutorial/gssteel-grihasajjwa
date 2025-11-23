@@ -31,6 +31,7 @@ import Cheques from "./pages/Cheques";
 import ChequeWeeklyView from "./pages/ChequeWeeklyView";
 import ChequeReminders from "./pages/ChequeReminders";
 import ChequeReconciliation from "./pages/ChequeReconciliation";
+import Orders from "./pages/Orders";
 import NotFound from "./pages/NotFound";
 
 
@@ -209,6 +210,11 @@ const AppRoutes = () => {
       <Route path="/cheque-reconciliation" element={
         <ProtectedRoute>
           <ChequeReconciliation />
+        </ProtectedRoute>
+      } />
+      <Route path="/orders" element={
+        <ProtectedRoute>
+          <Orders />
         </ProtectedRoute>
       } />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

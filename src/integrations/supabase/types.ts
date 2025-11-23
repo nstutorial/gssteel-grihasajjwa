@@ -823,6 +823,45 @@ export type Database = {
         }
         Relationships: []
       }
+      orders: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          notes: string | null
+          order_date: string
+          order_number: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          order_number?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          order_number?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       partner_transactions: {
         Row: {
           amount: number
@@ -1098,6 +1137,7 @@ export type Database = {
     Functions: {
       generate_bill_number: { Args: never; Returns: string }
       generate_loan_number: { Args: never; Returns: string }
+      generate_order_number: { Args: never; Returns: string }
       generate_sale_number: { Args: never; Returns: string }
       get_all_users_for_admin: {
         Args: never

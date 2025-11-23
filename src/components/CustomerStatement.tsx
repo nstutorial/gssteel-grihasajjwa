@@ -475,9 +475,9 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
                       Description
                       <Button
                         variant="link"
-                        size="xs"
+                        size="sm"
                         onClick={() => setShowFullDescription(val => !val)}
-                        className="ml-2 p-0"
+                        className="ml-2 p-0 h-auto"
                         tabIndex={-1}
                       >
                         {showFullDescription ? "Hide" : "Show"}
