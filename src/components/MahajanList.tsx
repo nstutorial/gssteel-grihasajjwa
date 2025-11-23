@@ -12,13 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight, Info, DollarSign } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useControl } from '@/contexts/ControlContext';
 import MahajanDetails from './MahajanDetails';
 import EditMahajanDialog from './EditMahajanDialog';
 import AddBillDialog from './AddBillDialog';
 import { AdvancePaymentDetailsDialog } from './AdvancePaymentDetailsDialog';
+import { RecordMahajanPaymentDialog } from './RecordMahajanPaymentDialog';
 
 interface Mahajan {
   id: string;
@@ -59,6 +60,8 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [advanceDetailsOpen, setAdvanceDetailsOpen] = useState(false);
   const [selectedMahajanForAdvance, setSelectedMahajanForAdvance] = useState<Mahajan | null>(null);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [selectedMahajanForPayment, setSelectedMahajanForPayment] = useState<Mahajan | null>(null);
 
   // Table view is default
   const [showTableView, setShowTableView] = useState(true);
@@ -336,6 +339,17 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
                       <Button variant="outline" size="sm" onClick={() => setSelectedMahajan(mahajan)}>
                         <Eye className="h-4 w-4" />
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedMahajanForPayment(mahajan);
+                          setPaymentDialogOpen(true);
+                        }}
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        <DollarSign className="h-4 w-4" />
+                      </Button>
                       {controlSettings.allowEdit && (
                         <Button
                           variant="ghost"
@@ -484,7 +498,19 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
                         className="flex-1"
                       >
                         <Eye className="h-4 w-4 mr-1" />
-                        View Details
+                        View
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedMahajanForPayment(mahajan);
+                          setPaymentDialogOpen(true);
+                        }}
+                        className="flex-1 text-green-600 hover:text-green-700"
+                      >
+                        <DollarSign className="h-4 w-4 mr-1" />
+                        Pay
                       </Button>
                       {controlSettings.allowBillManagement && (
                         <Button
@@ -494,7 +520,7 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
                           className="flex-1"
                         >
                           <Plus className="h-4 w-4 mr-1" />
-                          Add Bill
+                          Bill
                         </Button>
                       )}
                     </div>
@@ -584,6 +610,21 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
           onOpenChange={setAdvanceDetailsOpen}
           mahajanId={selectedMahajanForAdvance.id}
           mahajanName={selectedMahajanForAdvance.name}
+        />
+      )}
+
+      {/* Record Payment Dialog */}
+      {paymentDialogOpen && selectedMahajanForPayment && (
+        <RecordMahajanPaymentDialog
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          mahajanId={selectedMahajanForPayment.id}
+          mahajanName={selectedMahajanForPayment.name}
+          outstandingBalance={calculateOutstandingBalance(selectedMahajanForPayment)}
+          onPaymentRecorded={() => {
+            fetchMahajans();
+            if (onUpdate) onUpdate();
+          }}
         />
       )}
     </div>

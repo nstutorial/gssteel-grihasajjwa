@@ -37,6 +37,7 @@ export interface ControlSettings {
   allowEmailChange: boolean;
   allowBillManagement: boolean;
   allowMahajanDeletion: boolean;
+  allowAdmissionDeletion: boolean;
 }
 
 const Settings = () => {
@@ -65,6 +66,7 @@ const Settings = () => {
     allowEmailChange: true,
     allowBillManagement: true,
     allowMahajanDeletion: true,
+    allowAdmissionDeletion: true,
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -361,6 +363,7 @@ const Settings = () => {
           allowEmailChange: true,
           allowBillManagement: true,
           allowMahajanDeletion: true,
+          allowAdmissionDeletion: true,
         });
         } else {
           toast({
@@ -395,6 +398,7 @@ const Settings = () => {
           allowEmailChange: true,
           allowBillManagement: true,
           allowMahajanDeletion: true,
+          allowAdmissionDeletion: true,
         };
         
         if ((data as any)?.control_settings) {
@@ -432,6 +436,7 @@ const Settings = () => {
           allowEmailChange: true,
           allowBillManagement: true,
           allowMahajanDeletion: true,
+          allowAdmissionDeletion: true,
         };
         
         setSettings(defaultSettings);
@@ -703,6 +708,7 @@ const Settings = () => {
       allowEmailChange: true,
       allowBillManagement: true,
       allowMahajanDeletion: true,
+      allowAdmissionDeletion: true,
     };
 
     setSettings(defaultSettings);
@@ -1061,6 +1067,7 @@ const Settings = () => {
                         {key === 'allowEmailChange' && 'Email Change Permission'}
                         {key === 'allowBillManagement' && 'Bill Management Operations'}
                         {key === 'allowMahajanDeletion' && 'Mahajan Deletion Permission'}
+                        {key === 'allowAdmissionDeletion' && 'Admission Deletion Permission'}
                       </Label>
                       <p className="text-sm text-muted-foreground">
                         {key === 'allowEdit' && 'Show/hide edit buttons and modify forms throughout the app'}
@@ -1075,6 +1082,7 @@ const Settings = () => {
                         {key === 'allowEmailChange' && 'Enable/disable email change functionality for users'}
                         {key === 'allowBillManagement' && 'Show/hide bill management features in Mahajan section'}
                         {key === 'allowMahajanDeletion' && 'Enable/disable mahajan deletion functionality'}
+                        {key === 'allowAdmissionDeletion' && 'Enable/disable admission enquiry deletion functionality'}
                       </p>
                     </div>
                     <Switch

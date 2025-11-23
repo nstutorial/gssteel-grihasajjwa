@@ -14,6 +14,7 @@ export interface ControlSettings {
   allowRecordPayment: boolean;
   allowBillManagement: boolean;
   allowMahajanDeletion: boolean;
+  allowAdmissionDeletion: boolean;
 }
 
 interface ControlContextType {
@@ -38,6 +39,7 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
     allowRecordPayment: true,
     allowBillManagement: true,
     allowMahajanDeletion: true,
+    allowAdmissionDeletion: true,
   });
   const [loading, setLoading] = useState(false);
 
@@ -55,6 +57,7 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
         allowRecordPayment: true,
         allowBillManagement: true,
         allowMahajanDeletion: true,
+        allowAdmissionDeletion: true,
       });
       return;
     }
@@ -85,6 +88,7 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
             allowRecordPayment: true,
             allowBillManagement: true,
             allowMahajanDeletion: true,
+            allowAdmissionDeletion: true,
           });
         } else {
           throw error;
@@ -103,6 +107,7 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
           allowRecordPayment: true,
           allowBillManagement: true,
           allowMahajanDeletion: true,
+          allowAdmissionDeletion: true,
         };
         const dbSettings = (data as any).control_settings;
         setSettings({
@@ -123,6 +128,7 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
           allowRecordPayment: true,
           allowBillManagement: true,
           allowMahajanDeletion: true,
+          allowAdmissionDeletion: true,
         });
       }
       
@@ -140,6 +146,7 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
         allowRecordPayment: true,
         allowBillManagement: true,
         allowMahajanDeletion: true,
+        allowAdmissionDeletion: true,
       });
     } finally {
       setLoading(false);

@@ -121,8 +121,9 @@ export function RecordPartnerPaymentDialog({
         .order('bill_date', { ascending: true });
 
       let remainingAmount = amountNum;
+      let billsPaid = 0;
 
-      // First, try to pay off active bills
+      // First, try to pay off active bills (if any exist)
       if (activeBills && activeBills.length > 0) {
         for (const bill of activeBills) {
           if (remainingAmount <= 0) break;
@@ -157,6 +158,7 @@ export function RecordPartnerPaymentDialog({
             if (billTxError) throw billTxError;
 
             remainingAmount -= paymentForBill;
+            billsPaid++;
 
             // Mark bill as inactive if fully paid
             if (paymentForBill >= billOutstanding) {
@@ -169,7 +171,7 @@ export function RecordPartnerPaymentDialog({
         }
       }
 
-      // If there's remaining amount, add to mahajan's advance payment
+      // Add remaining amount to mahajan's advance payment (or full amount if no bills)
       if (remainingAmount > 0) {
         const { data: mahajan } = await supabase
           .from('mahajans')
@@ -182,10 +184,37 @@ export function RecordPartnerPaymentDialog({
             .from('mahajans')
             .update({ advance_payment: (mahajan.advance_payment || 0) + remainingAmount })
             .eq('id', mahajanId);
+          
+          // Insert advance payment transaction record
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              await supabase
+                .from('advance_payment_transactions' as any)
+                .insert({
+                  user_id: user.id,
+                  mahajan_id: mahajanId,
+                  amount: remainingAmount,
+                  payment_date: paymentDate,
+                  payment_mode: paymentMode as 'cash' | 'bank',
+                  notes: `Overpayment from partner payment - FROM ${partnerName}${notes ? ' - ' + notes : ''}`,
+                });
+            }
+          } catch (err) {
+            console.log('Advance payment transaction table not available yet');
+          }
         }
       }
 
-      toast.success('Payment recorded successfully');
+      // Show appropriate success message
+      if (billsPaid > 0 && remainingAmount > 0) {
+        toast.success(`Payment recorded: ${billsPaid} bill(s) paid, ₹${remainingAmount.toFixed(2)} added to advance`);
+      } else if (billsPaid > 0) {
+        toast.success(`Payment recorded: ${billsPaid} bill(s) paid`);
+      } else {
+        toast.success(`Payment recorded: ₹${amountNum.toFixed(2)} added to advance (no active bills)`);
+      }
+      
       setMahajanId('');
       setAmount('');
       setNotes('');

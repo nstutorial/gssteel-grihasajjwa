@@ -31,6 +31,7 @@ import { TabSettings } from '@/pages/Settings';
 import { useToast } from '@/hooks/use-toast';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useControl } from '@/contexts/ControlContext';
+import { ChequeReminderDialog } from '@/components/ChequeReminderDialog';
 
 interface DashboardStats {
   activeLoans: number;
@@ -52,6 +53,7 @@ const Dashboard = () => {
   });
   const [addLoanDialogOpen, setAddLoanDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('customers');
+  const [showChequeReminders, setShowChequeReminders] = useState(false);
   const [tabSettings, setTabSettings] = useState<TabSettings>({
     loans: true,
     customers: true,
@@ -207,6 +209,16 @@ const Dashboard = () => {
     fetchStats();
   }, [user]);
   
+  // Show cheque reminder dialog after login
+  useEffect(() => {
+    if (user) {
+      const timer = setTimeout(() => {
+        setShowChequeReminders(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+  
   // Show loading spinner while auth is loading
   if (loading) {
     return <LoadingSpinner message="Initializing your dashboard..." size="lg" />;
@@ -310,9 +322,9 @@ const Dashboard = () => {
             <div className="overflow-x-auto">
               <TabsList className="grid w-full min-w-max" style={{ gridTemplateColumns: `repeat(${Object.values(tabSettings).filter(Boolean).length}, 1fr)` }}>
                 {tabSettings.loans && <TabsTrigger value="loans" className="text-xs sm:text-sm">Loans</TabsTrigger>}
-                {tabSettings.customers && <TabsTrigger value="customers" className="text-xs sm:text-sm">Customers</TabsTrigger>}
+                {tabSettings.customers && <TabsTrigger value="customers" className="text-xs sm:text-sm">Loan Customers</TabsTrigger>}
                 {tabSettings.mahajans && <TabsTrigger value="mahajans" className="text-xs sm:text-sm">Mahajans</TabsTrigger>}
-                {tabSettings.bill_customers && <TabsTrigger value="bill_customers" className="text-xs sm:text-sm">Bill Customers</TabsTrigger>}
+                {tabSettings.bill_customers && <TabsTrigger value="bill_customers" className="text-xs sm:text-sm">Sale Customers</TabsTrigger>}
                 {tabSettings.daywise && <TabsTrigger value="daywise" className="text-xs sm:text-sm">Collection</TabsTrigger>}
                 {tabSettings.payments && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
               </TabsList>
@@ -464,6 +476,12 @@ const Dashboard = () => {
           fetchStats();
           window.dispatchEvent(new CustomEvent('refresh-loans'));
         }}
+      />
+
+      {/* Cheque Reminder Dialog */}
+      <ChequeReminderDialog 
+        open={showChequeReminders} 
+        onOpenChange={setShowChequeReminders}
       />
     </div>
     </SidebarProvider>
