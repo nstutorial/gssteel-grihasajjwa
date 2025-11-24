@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -14,58 +15,47 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
-interface Order {
-  id: string;
-  order_number: string;
-  title: string;
-  description: string | null;
-  order_date: string;
-  status: string;
-  notes: string | null;
-}
-
-interface EditOrderDialogProps {
+interface AddOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  order: Order;
 }
 
-const EditOrderDialog = ({ open, onOpenChange, order }: EditOrderDialogProps) => {
+const AddTaskDialog = ({ open, onOpenChange }: AddOrderDialogProps) => {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
-    title: order.title,
-    description: order.description || "",
-    order_date: order.order_date,
-    status: order.status,
-    notes: order.notes || "",
+    title: "",
+    description: "",
+    order_date: new Date().toISOString().split("T")[0],
+    status: "pending",
+    notes: "",
   });
 
-  useEffect(() => {
-    setFormData({
-      title: order.title,
-      description: order.description || "",
-      order_date: order.order_date,
-      status: order.status,
-      notes: order.notes || "",
-    });
-  }, [order]);
-
-  const updateMutation = useMutation({
+  const addMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase
-        .from("orders")
-        .update(data)
-        .eq("id", order.id);
+      if (!user?.id) throw new Error("User not authenticated");
+
+      const { error } = await supabase.from("orders").insert({
+        user_id: user.id,
+        ...data,
+      });
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      toast.success("Order updated successfully");
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success("Task created successfully");
       onOpenChange(false);
+      setFormData({
+        title: "",
+        description: "",
+        order_date: new Date().toISOString().split("T")[0],
+        status: "pending",
+        notes: "",
+      });
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update order: ${error.message}`);
+      toast.error(`Failed to create task: ${error.message}`);
     },
   });
 
@@ -75,14 +65,14 @@ const EditOrderDialog = ({ open, onOpenChange, order }: EditOrderDialogProps) =>
       toast.error("Please enter a title");
       return;
     }
-    updateMutation.mutate(formData);
+    addMutation.mutate(formData);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Edit Order - {order.order_number}</DialogTitle>
+          <DialogTitle>Add New Task</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -91,13 +81,13 @@ const EditOrderDialog = ({ open, onOpenChange, order }: EditOrderDialogProps) =>
               id="title"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="Enter order title"
+              placeholder="Enter task title"
               required
             />
           </div>
 
           <div>
-            <Label htmlFor="order_date">Order Date</Label>
+            <Label htmlFor="order_date">Task Date</Label>
             <Input
               id="order_date"
               type="date"
@@ -130,7 +120,7 @@ const EditOrderDialog = ({ open, onOpenChange, order }: EditOrderDialogProps) =>
               id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Enter order description"
+              placeholder="Enter task description"
               rows={3}
             />
           </div>
@@ -150,8 +140,8 @@ const EditOrderDialog = ({ open, onOpenChange, order }: EditOrderDialogProps) =>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Updating..." : "Update Order"}
+            <Button type="submit" disabled={addMutation.isPending}>
+              {addMutation.isPending ? "Creating..." : "Create Task"}
             </Button>
           </div>
         </form>
@@ -160,4 +150,4 @@ const EditOrderDialog = ({ open, onOpenChange, order }: EditOrderDialogProps) =>
   );
 };
 
-export default EditOrderDialog;
+export default AddTaskDialog;

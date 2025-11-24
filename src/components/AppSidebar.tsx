@@ -31,7 +31,7 @@ export function AppSidebar({ onSettingsClick, onProfileClick }: AppSidebarProps)
     { title: 'Partners', icon: Users, onClick: () => navigate('/partners') },
     { title: 'Firm Accounts', icon: Receipt, onClick: () => navigate('/firm-accounts') },
     { title: 'Cheques', icon: FileText, onClick: () => navigate('/cheques') },
-    { title: 'Orders', icon: ClipboardList, onClick: () => navigate('/orders') },
+    { title: 'Tasks', icon: ClipboardList, onClick: () => navigate('/tasks') },
     { title: 'Admission Enquiry', icon: GraduationCap, onClick: () => navigate('/admission-enquiry') },
     { title: 'Profile', icon: User, onClick: onProfileClick },
     { title: 'Settings', icon: Settings, onClick: onSettingsClick },
