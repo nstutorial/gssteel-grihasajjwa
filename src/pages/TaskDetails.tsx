@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Calendar, FileText, Clock } from "lucide-react"; // Added new icons
 import { format } from "date-fns";
 
 interface Task {
@@ -43,15 +43,20 @@ const TaskDetails = () => {
   });
 
   const getStatusBadge = (status: string) => {
+    // Enhanced variant mapping for better visual distinction
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      pending: "outline",
-      processing: "secondary",
-      completed: "default",
-      delivered: "default",
+      pending: "secondary", // Changed to secondary for more visibility than 'outline'
+      processing: "default", // Changed to default
+      completed: "outline", // Using outline for completed to denote a final state elegantly
+      delivered: "outline",
     };
 
+    // Added bg-opacity and font-medium for subtle style changes
     return (
-      <Badge variant={variants[status] || "outline"}>
+      <Badge 
+        variant={variants[status] || "secondary"} 
+        className="text-sm px-3 py-1 font-medium bg-opacity-80"
+      >
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
@@ -59,67 +64,102 @@ const TaskDetails = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">Loading task details...</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg font-semibold text-gray-500">Loading task details...</div>
       </div>
     );
   }
 
   if (!task) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">Task not found</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl font-bold text-red-600">Task not found</div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/tasks")}>
+    <div className="container mx-auto max-w-4xl p-8 space-y-8 bg-gray-50 min-h-screen"> 
+      {/* Container: Centered, wider max-width, slightly padded background */}
+      
+      <div className="flex items-center justify-start">
+        <Button 
+          variant="outline" // Changed to outline for a cleaner look
+          size="sm" 
+          onClick={() => navigate("/tasks")}
+          className="hover:bg-gray-200 transition-colors duration-200 shadow-sm" // Added subtle hover and shadow
+        >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Tasks
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-start">
+      <Card className="shadow-2xl border-t-4 border-blue-500 transition-shadow duration-300 hover:shadow-3xl"> 
+        {/* Main Card: More prominent shadow and a distinct top border */}
+        <CardHeader className="p-6 border-b border-gray-100">
+          <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-3">
             <div>
-              <CardTitle className="text-2xl">Task #{task.order_number}</CardTitle>
-              <p className="text-muted-foreground mt-2">{task.title}</p>
+              <CardTitle className="text-3xl font-extrabold text-gray-800 mb-1">
+                Task #{task.order_number}
+              </CardTitle>
+              <p className="text-lg font-medium text-blue-600">
+                {task.title}
+              </p>
             </div>
             {getStatusBadge(task.status)}
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="font-semibold mb-2">Task Date</h3>
-              <p className="text-muted-foreground">
-                {format(new Date(task.order_date), "dd MMM yyyy")}
-              </p>
+        
+        <CardContent className="p-6 space-y-8">
+          {/* Metadata Section (Date and Creation Time) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50">
+            
+            {/* Task Date */}
+            <div className="flex items-center space-x-3">
+              <Calendar className="h-6 w-6 text-blue-500 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-gray-700 text-sm mb-1">Task Date</h3>
+                <p className="text-gray-900 text-md font-medium">
+                  {format(new Date(task.order_date), "dd MMMM yyyy")}
+                </p>
+              </div>
             </div>
 
-            <div>
-              <h3 className="font-semibold mb-2">Created At</h3>
-              <p className="text-muted-foreground">
-                {format(new Date(task.created_at), "dd MMM yyyy, hh:mm a")}
-              </p>
+            {/* Created At */}
+            <div className="flex items-center space-x-3">
+              <Clock className="h-6 w-6 text-green-500 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-gray-700 text-sm mb-1">Created At</h3>
+                <p className="text-gray-900 text-md font-medium">
+                  {format(new Date(task.created_at), "dd MMM yyyy, hh:mm a")}
+                </p>
+              </div>
             </div>
           </div>
 
+          {/* Description Section */}
           {task.description && (
-            <div>
-              <h3 className="font-semibold mb-2">Description</h3>
-              <p className="text-muted-foreground whitespace-pre-wrap">{task.description}</p>
+            <div className="border-l-4 border-yellow-400 pl-4 py-1">
+              <div className="flex items-center mb-3">
+                <FileText className="h-5 w-5 mr-2 text-yellow-600" />
+                <h3 className="font-bold text-gray-800 text-lg">Description</h3>
+              </div>
+              <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                {task.description}
+              </p>
             </div>
           )}
 
+          {/* Notes Section */}
           {task.notes && (
-            <div>
-              <h3 className="font-semibold mb-2">Notes</h3>
-              <p className="text-muted-foreground whitespace-pre-wrap">{task.notes}</p>
+            <div className="border-l-4 border-purple-400 pl-4 py-1">
+              <div className="flex items-center mb-3">
+                <FileText className="h-5 w-5 mr-2 text-purple-600" />
+                <h3 className="font-bold text-gray-800 text-lg">Notes / Remarks</h3>
+              </div>
+              <p className="text-gray-700 whitespace-pre-wrap leading-relaxed italic">
+                {task.notes}
+              </p>
             </div>
           )}
         </CardContent>
