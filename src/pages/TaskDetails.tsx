@@ -64,32 +64,47 @@ const TaskDetails = () => {
    * Constructs the WhatsApp share text with markdown formatting and opens the share link.
    * WhatsApp formatting uses: *bold*, _italic_, ~strikethrough~.
    */
+ /**
+   * Constructs the WhatsApp share text with markdown formatting and opens the share link.
+   * Uses the official wa.me link for reliable sharing across devices.
+   */
   const handleShare = () => {
     if (!task) return;
 
-    // Construct the formatted message for WhatsApp
+    // 1. Format the Task Data
     const orderDateFormatted = format(new Date(task.order_date), "dd MMM yyyy");
     const statusFormatted = task.status.charAt(0).toUpperCase() + task.status.slice(1);
     
+    // 2. Construct the Formatted Message for WhatsApp
+    // Note: Line breaks (\n) and special characters are preserved after URL encoding.
     const message = `
-*📢 New Task Details!* ---------------------------------
+*📢 Task Details* ---------------------------------
 *Order No:* #${task.order_number}
 *Title:* ${task.title}
 *Status:* ${statusFormatted}
-_Scheduled Date:_ ${orderDateFormatted}
+_Date:_ ${orderDateFormatted}
     
 ${task.description ? `*Description:*\n${task.description}` : ''}
 ${task.notes ? `\n_Notes: ${task.notes}_` : ''}
 
-_Check it out in the app!_
+_View this task in our app._
     `;
 
-    // URL-encode the message and construct the WhatsApp deep link
+    // 3. URL-encode the message and construct the WhatsApp Universal Link (wa.me)
     const encodedMessage = encodeURIComponent(message.trim());
+    
+    // Using wa.me is the standard and most reliable method for deep linking across platforms.
     const whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
     
-    // Open the WhatsApp share link
-    window.open(whatsappUrl, '_blank');
+    // 4. Open the Share Link
+    // We use a try/catch block just in case window.open is blocked, though it won't 
+    // catch all network/CSP errors, it provides a small layer of resilience.
+    try {
+      window.open(whatsappUrl, '_blank');
+    } catch (error) {
+      console.error("Failed to open WhatsApp share window:", error);
+      alert("Could not open WhatsApp. Please check your browser's pop-up settings or network security restrictions.");
+    }
   };
 
   if (isLoading) {
