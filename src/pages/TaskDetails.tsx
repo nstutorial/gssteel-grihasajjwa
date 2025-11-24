@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Calendar, FileText, Clock } from "lucide-react"; // Added new icons
+import { ArrowLeft, Calendar, FileText, Clock, Share2, MessageCircle } from "lucide-react"; 
 import { format } from "date-fns";
 
 interface Task {
@@ -43,15 +43,13 @@ const TaskDetails = () => {
   });
 
   const getStatusBadge = (status: string) => {
-    // Enhanced variant mapping for better visual distinction
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      pending: "secondary", // Changed to secondary for more visibility than 'outline'
-      processing: "default", // Changed to default
-      completed: "outline", // Using outline for completed to denote a final state elegantly
+      pending: "secondary",
+      processing: "default",
+      completed: "outline",
       delivered: "outline",
     };
 
-    // Added bg-opacity and font-medium for subtle style changes
     return (
       <Badge 
         variant={variants[status] || "secondary"} 
@@ -60,6 +58,38 @@ const TaskDetails = () => {
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
+  };
+
+  /**
+   * Constructs the WhatsApp share text with markdown formatting and opens the share link.
+   * WhatsApp formatting uses: *bold*, _italic_, ~strikethrough~.
+   */
+  const handleShare = () => {
+    if (!task) return;
+
+    // Construct the formatted message for WhatsApp
+    const orderDateFormatted = format(new Date(task.order_date), "dd MMM yyyy");
+    const statusFormatted = task.status.charAt(0).toUpperCase() + task.status.slice(1);
+    
+    const message = `
+*📢 New Task Details!* ---------------------------------
+*Order No:* #${task.order_number}
+*Title:* ${task.title}
+*Status:* ${statusFormatted}
+_Scheduled Date:_ ${orderDateFormatted}
+    
+${task.description ? `*Description:*\n${task.description}` : ''}
+${task.notes ? `\n_Notes: ${task.notes}_` : ''}
+
+_Check it out in the app!_
+    `;
+
+    // URL-encode the message and construct the WhatsApp deep link
+    const encodedMessage = encodeURIComponent(message.trim());
+    const whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
+    
+    // Open the WhatsApp share link
+    window.open(whatsappUrl, '_blank');
   };
 
   if (isLoading) {
@@ -80,14 +110,13 @@ const TaskDetails = () => {
 
   return (
     <div className="container mx-auto max-w-4xl p-8 space-y-8 bg-gray-50 min-h-screen"> 
-      {/* Container: Centered, wider max-width, slightly padded background */}
       
       <div className="flex items-center justify-start">
         <Button 
-          variant="outline" // Changed to outline for a cleaner look
+          variant="outline" 
           size="sm" 
           onClick={() => navigate("/tasks")}
-          className="hover:bg-gray-200 transition-colors duration-200 shadow-sm" // Added subtle hover and shadow
+          className="hover:bg-gray-200 transition-colors duration-200 shadow-sm"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Tasks
@@ -95,7 +124,6 @@ const TaskDetails = () => {
       </div>
 
       <Card className="shadow-2xl border-t-4 border-blue-500 transition-shadow duration-300 hover:shadow-3xl"> 
-        {/* Main Card: More prominent shadow and a distinct top border */}
         <CardHeader className="p-6 border-b border-gray-100">
           <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-3">
             <div>
@@ -111,6 +139,15 @@ const TaskDetails = () => {
         </CardHeader>
         
         <CardContent className="p-6 space-y-8">
+          
+          {/* Share Button Section */}
+          <div className="flex justify-end">
+            <Button onClick={handleShare} className="bg-green-500 hover:bg-green-600 transition-colors duration-200 shadow-md">
+                <MessageCircle className="h-5 w-5 mr-2" />
+                Share via WhatsApp
+            </Button>
+          </div>
+
           {/* Metadata Section (Date and Creation Time) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-4 border rounded-lg bg-gray-50">
             
@@ -137,9 +174,10 @@ const TaskDetails = () => {
             </div>
           </div>
 
-          {/* Description Section */}
+          {/* Description Section with Light BG Color */}
           {task.description && (
-            <div className="border-l-4 border-yellow-400 pl-4 py-1">
+            <div className="border-l-4 border-yellow-400 pl-4 py-3 rounded-md bg-yellow-50"> 
+              {/* Added bg-yellow-50 for light background */}
               <div className="flex items-center mb-3">
                 <FileText className="h-5 w-5 mr-2 text-yellow-600" />
                 <h3 className="font-bold text-gray-800 text-lg">Description</h3>
