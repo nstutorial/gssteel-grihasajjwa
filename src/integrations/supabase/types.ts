@@ -578,6 +578,7 @@ export type Database = {
           bank_name: string | null
           created_at: string
           current_balance: number
+          display_order: number | null
           id: string
           is_active: boolean
           opening_balance: number
@@ -591,6 +592,7 @@ export type Database = {
           bank_name?: string | null
           created_at?: string
           current_balance?: number
+          display_order?: number | null
           id?: string
           is_active?: boolean
           opening_balance?: number
@@ -604,6 +606,7 @@ export type Database = {
           bank_name?: string | null
           created_at?: string
           current_balance?: number
+          display_order?: number | null
           id?: string
           is_active?: boolean
           opening_balance?: number
