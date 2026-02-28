@@ -165,34 +165,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    const maxRetries = 3;
+    let lastError: any = null;
 
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Sign In Error",
-          description: error.message,
-        });
-      } else {
-        // On mobile, wait a bit for the session to be properly set
-        if (window.innerWidth < 768) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Check if online before attempting
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          toast({
+            variant: "destructive",
+            title: "No Internet Connection",
+            description: "Please check your internet connection and try again.",
+          });
+          return { error: { message: 'No internet connection' } };
         }
+
+        const { error } = await Promise.race([
+          supabase.auth.signInWithPassword({ email, password }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Request timed out. Please check your internet connection.')), 15000)
+          ),
+        ]);
+
+        if (error) {
+          // Don't retry auth errors (wrong password etc), only network errors
+          if (!error.message?.includes('fetch') && !error.message?.includes('network') && !error.message?.includes('timeout')) {
+            toast({
+              variant: "destructive",
+              title: "Sign In Error",
+              description: error.message,
+            });
+            return { error };
+          }
+          lastError = error;
+        } else {
+          // Success
+          if (window.innerWidth < 768) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          return { error: null };
+        }
+      } catch (error: any) {
+        lastError = error;
       }
 
-      return { error };
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Sign In Error",
-        description: error.message,
-      });
-      return { error };
+      // Wait before retrying (exponential backoff)
+      if (attempt < maxRetries) {
+        console.log(`Sign in attempt ${attempt} failed, retrying in ${attempt * 2}s...`);
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+      }
     }
+
+    // All retries exhausted
+    toast({
+      variant: "destructive",
+      title: "Connection Error",
+      description: "Unable to sign in due to poor internet connection. Please check your connection and try again.",
+    });
+    return { error: lastError || { message: 'Connection failed after retries' } };
   };
 
   const signOut = async () => {
