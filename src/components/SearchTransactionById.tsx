@@ -53,7 +53,7 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
     ...advanceTransactions.map(t => ({ ...t, source: 'advance' as const }))
   ];
 
-  // 🔍 Search by Reference Number only (8-digit payment reference)
+  // 🔍 Search by Reference Number (REF# or ADV- prefix)
   const handleSearch = () => {
     const term = searchTerm.trim();
     if (!term) {
@@ -62,11 +62,15 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
       return;
     }
 
-    // Search only by reference number in notes field
     const result = allTransactions.filter((t) => {
       const notes = t.notes || '';
-      // Look for REF#12345678 pattern
-      return notes.includes(`REF#${term}`);
+      // Search by REF#12345678 pattern in notes
+      if (notes.includes(`REF#${term}`)) return true;
+      // Search advance transactions by ID prefix (ADV-xxxxxxxx)
+      if (t.source === 'advance' && t.id.startsWith(term)) return true;
+      // Also match if user types full ADV- prefix
+      if (t.source === 'advance' && `ADV-${t.id.slice(0, 8)}` === `ADV-${term}`) return true;
+      return false;
     });
     
     if (result.length === 0) {
@@ -174,7 +178,7 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
       <div className="flex items-center space-x-2">
         <Input
           type="text"
-          placeholder="Enter 8-digit payment reference number"
+          placeholder="Enter REF# number or ADV- ID (e.g. 12345678)"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -205,7 +209,15 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
             <TableBody>
               {paginatedTransactions.map((t) => (
                 <TableRow key={`${t.source}-${t.id}`}>
-                  <TableCell className="font-mono text-xs">{t.id.slice(0, 8)}...</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {t.source === 'advance' 
+                      ? `ADV-${t.id.slice(0, 8)}` 
+                      : (() => {
+                          const refMatch = t.notes?.match(/REF#(\d{8})/);
+                          return refMatch ? `REF#${refMatch[1]}` : t.id.slice(0, 8) + '...';
+                        })()
+                    }
+                  </TableCell>
                   <TableCell>
                     <span className={t.source === 'bill' ? 'text-blue-600' : 'text-green-600'}>
                       {t.source === 'bill' ? 'Bill Payment' : 'Advance Payment'}
@@ -261,7 +273,7 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
         </>
       ) : (
         <p className="text-center text-muted-foreground pt-6">
-          No transactions to display. Enter a payment reference number to find all transactions from that payment.
+          No transactions to display. Enter a REF# number or ADV- ID to find transactions.
         </p>
       )}
 
