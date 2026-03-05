@@ -100,7 +100,10 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
     payment_date: new Date().toISOString().split('T')[0],
     notes: '',
     payment_mode: 'cash' as 'cash' | 'bank',
+    bank_sub_type: 'net_banking' as 'net_banking' | 'cheque',
+    cheque_no: '',
   });
+  const [chequeError, setChequeError] = useState('');
 
   const [advanceAdjustData, setAdvanceAdjustData] = useState({
     amount: '',
@@ -277,10 +280,43 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
       return;
     }
 
+    // Cheque validation
+    if (paymentData.payment_mode === 'bank' && paymentData.bank_sub_type === 'cheque') {
+      if (!paymentData.cheque_no.trim()) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Please enter cheque number' });
+        return;
+      }
+      const { data: existingCheque } = await supabase
+        .from('cheques')
+        .select('id')
+        .eq('cheque_number', paymentData.cheque_no.trim())
+        .eq('user_id', user?.id)
+        .maybeSingle();
+      if (existingCheque) {
+        setChequeError('This cheque number already exists');
+        toast({ variant: 'destructive', title: 'Duplicate', description: 'Cheque number already exists' });
+        return;
+      }
+      const { data: partnerTxns } = await supabase
+        .from('partner_transactions')
+        .select('id, notes')
+        .ilike('notes', `%Cheque #${paymentData.cheque_no.trim()}%`);
+      if (partnerTxns && partnerTxns.length > 0) {
+        setChequeError('Cheque number already used in a transaction');
+        toast({ variant: 'destructive', title: 'Duplicate', description: 'Cheque number already used' });
+        return;
+      }
+      setChequeError('');
+    }
+
     setLoading(true);
     try {
       // Generate 8-digit reference number
       const referenceNumber = Math.floor(10000000 + Math.random() * 90000000).toString();
+      const bankInfo = paymentData.payment_mode === 'bank' 
+        ? (paymentData.bank_sub_type === 'cheque' ? `Cheque #${paymentData.cheque_no.trim()}` : 'Net Banking')
+        : '';
+      const baseNotes = [bankInfo, paymentData.notes].filter(Boolean).join(' - ');
       
       // Get all active bills sorted by bill_date (oldest first)
       const activeBills = bills
@@ -310,7 +346,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
               transaction_type: 'interest',
               payment_mode: paymentData.payment_mode,
               payment_date: paymentData.payment_date,
-              notes: `REF#${referenceNumber}${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
+              notes: `REF#${referenceNumber}${baseNotes ? ' - ' + baseNotes : ''}`,
             });
             remainingPayment -= interestPayment;
           }
@@ -324,7 +360,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
               transaction_type: 'principal',
               payment_mode: paymentData.payment_mode,
               payment_date: paymentData.payment_date,
-              notes: `REF#${referenceNumber}${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
+              notes: `REF#${referenceNumber}${baseNotes ? ' - ' + baseNotes : ''}`,
             });
             remainingPayment -= principalPayment;
           }
@@ -363,8 +399,8 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
               payment_date: paymentData.payment_date,
               payment_mode: paymentData.payment_mode,
               notes: activeBills.length === 0 
-                ? `Direct advance payment${paymentData.notes ? ' - ' + paymentData.notes : ''}`
-                : `Overpayment from bill payments${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
+                ? `Direct advance payment${baseNotes ? ' - ' + baseNotes : ''}`
+                : `Overpayment from bill payments${baseNotes ? ' - ' + baseNotes : ''}`,
             });
         } catch (err) {
           console.log('Advance payment transaction table not available yet');
@@ -393,7 +429,10 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         payment_date: new Date().toISOString().split('T')[0],
         notes: '',
         payment_mode: 'cash',
+        bank_sub_type: 'net_banking',
+        cheque_no: '',
       });
+      setChequeError('');
       setShowPaymentDialog(false);
 
       fetchBillsAndTransactions();
@@ -724,10 +763,10 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handlePaymentSubmit} className="space-y-4">
+          <form onSubmit={handlePaymentSubmit} className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
             <div className="space-y-2">
               <Label>Total Outstanding</Label>
-              <div className="text-2xl font-bold text-red-600">
+              <div className="text-2xl font-bold text-destructive">
                 {formatCurrency(calculateTotalOutstanding())}
               </div>
               <p className="text-sm text-muted-foreground">
@@ -764,7 +803,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
               <Select 
                 value={paymentData.payment_mode} 
                 onValueChange={(value: 'cash' | 'bank') => 
-                  setPaymentData({ ...paymentData, payment_mode: value })
+                  setPaymentData({ ...paymentData, payment_mode: value, bank_sub_type: 'net_banking', cheque_no: '' })
                 }
               >
                 <SelectTrigger>
@@ -776,6 +815,47 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
                 </SelectContent>
               </Select>
             </div>
+
+            {paymentData.payment_mode === 'bank' && (
+              <div className="space-y-2">
+                <Label>Bank Payment Type</Label>
+                <Select 
+                  value={paymentData.bank_sub_type} 
+                  onValueChange={(value: 'net_banking' | 'cheque') => {
+                    setPaymentData({ ...paymentData, bank_sub_type: value, cheque_no: '' });
+                    setChequeError('');
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="net_banking">Net Banking</SelectItem>
+                    <SelectItem value="cheque">Cheque</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {paymentData.payment_mode === 'bank' && paymentData.bank_sub_type === 'cheque' && (
+              <div className="space-y-2">
+                <Label htmlFor="cheque_no">Cheque Number *</Label>
+                <Input
+                  id="cheque_no"
+                  type="text"
+                  placeholder="Enter cheque number"
+                  value={paymentData.cheque_no}
+                  onChange={(e) => {
+                    setPaymentData({ ...paymentData, cheque_no: e.target.value });
+                    setChequeError('');
+                  }}
+                  required
+                />
+                {chequeError && (
+                  <p className="text-sm text-destructive">{chequeError}</p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
