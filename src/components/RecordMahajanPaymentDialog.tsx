@@ -46,6 +46,9 @@ export function RecordMahajanPaymentDialog({
   const [amount, setAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentMode, setPaymentMode] = useState<'cash' | 'bank'>('cash');
+  const [bankSubType, setBankSubType] = useState<'net_banking' | 'cheque'>('net_banking');
+  const [chequeNo, setChequeNo] = useState('');
+  const [chequeError, setChequeError] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -95,15 +98,42 @@ export function RecordMahajanPaymentDialog({
       return;
     }
 
+    if (paymentMode === 'bank' && bankSubType === 'cheque') {
+      if (!chequeNo.trim()) {
+        toast.error('Please enter cheque number');
+        return;
+      }
+      // Check duplicate cheque number
+      const { data: existingCheque } = await supabase
+        .from('cheques')
+        .select('id')
+        .eq('cheque_number', chequeNo.trim())
+        .eq('user_id', user?.id)
+        .maybeSingle();
+
+      if (existingCheque) {
+        setChequeError('This cheque number already exists');
+        toast.error('Duplicate cheque number');
+        return;
+      }
+      setChequeError('');
+    }
+
     setLoading(true);
 
     try {
       const paymentAmount = parseFloat(amount);
+      const bankInfo = paymentMode === 'bank' 
+        ? (bankSubType === 'cheque' ? `Cheque #${chequeNo.trim()}` : 'Net Banking')
+        : '';
+      const enrichedNotes = bankInfo 
+        ? (notes ? `[${bankInfo}] ${notes}` : `[${bankInfo}]`)
+        : notes;
 
       if (sourceType === 'partner') {
-        await handlePartnerPayment(paymentAmount);
+        await handlePartnerPayment(paymentAmount, enrichedNotes);
       } else {
-        await handleFirmAccountPayment(paymentAmount);
+        await handleFirmAccountPayment(paymentAmount, enrichedNotes);
       }
 
       toast.success('Payment recorded successfully');
@@ -118,14 +148,14 @@ export function RecordMahajanPaymentDialog({
     }
   };
 
-  const handlePartnerPayment = async (paymentAmount: number) => {
+  const handlePartnerPayment = async (paymentAmount: number, enrichedNotes: string) => {
     const partner = partners.find(p => p.id === selectedSourceId);
     
     if (outstandingBalance <= 0 || paymentAmount > outstandingBalance) {
       const advanceAmount = outstandingBalance <= 0 ? paymentAmount : paymentAmount - outstandingBalance;
       
-      const notesText = notes 
-        ? `Overpayment from partner payment FROM ${partner?.name} - ${notes}`
+      const notesText = enrichedNotes 
+        ? `Overpayment from partner payment FROM ${partner?.name} - ${enrichedNotes}`
         : `Overpayment from partner payment FROM ${partner?.name}`;
 
       const { error: advanceError } = await supabase
@@ -165,13 +195,13 @@ export function RecordMahajanPaymentDialog({
         amount: paymentAmount,
         payment_date: paymentDate,
         payment_mode: paymentMode,
-        notes: notes || `Payment to ${mahajanName}`,
+        notes: enrichedNotes || `Payment to ${mahajanName}`,
       });
 
     if (partnerTxnError) throw partnerTxnError;
   };
 
-  const handleFirmAccountPayment = async (paymentAmount: number) => {
+  const handleFirmAccountPayment = async (paymentAmount: number, enrichedNotes: string) => {
     const firmAccount = firmAccounts.find(f => f.id === selectedSourceId);
     
     if (firmAccount && firmAccount.current_balance < paymentAmount) {
@@ -186,7 +216,7 @@ export function RecordMahajanPaymentDialog({
         amount: -paymentAmount,
         transaction_type: 'Payment to Mahajan',
         transaction_date: paymentDate,
-        description: notes || `Payment to ${mahajanName}`,
+        description: enrichedNotes || `Payment to ${mahajanName}`,
       });
 
     if (firmTxnError) throw firmTxnError;
@@ -203,8 +233,8 @@ export function RecordMahajanPaymentDialog({
     if (outstandingBalance <= 0 || paymentAmount > outstandingBalance) {
       const advanceAmount = outstandingBalance <= 0 ? paymentAmount : paymentAmount - outstandingBalance;
       
-      const notesText = notes 
-        ? `Overpayment from firm account FROM ${firmAccount?.account_name} - ${notes}`
+      const notesText = enrichedNotes 
+        ? `Overpayment from firm account FROM ${firmAccount?.account_name} - ${enrichedNotes}`
         : `Overpayment from firm account FROM ${firmAccount?.account_name}`;
 
       const { error: advanceError } = await supabase
@@ -243,6 +273,9 @@ export function RecordMahajanPaymentDialog({
     setAmount('');
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setPaymentMode('cash');
+    setBankSubType('net_banking');
+    setChequeNo('');
+    setChequeError('');
     setNotes('');
   };
 
@@ -340,7 +373,14 @@ export function RecordMahajanPaymentDialog({
 
           <div className="space-y-2">
             <Label>Payment Mode</Label>
-            <Select value={paymentMode} onValueChange={(value: 'cash' | 'bank') => setPaymentMode(value)}>
+            <Select value={paymentMode} onValueChange={(value: 'cash' | 'bank') => {
+              setPaymentMode(value);
+              if (value === 'cash') {
+                setBankSubType('net_banking');
+                setChequeNo('');
+                setChequeError('');
+              }
+            }}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -350,6 +390,47 @@ export function RecordMahajanPaymentDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {paymentMode === 'bank' && (
+            <div className="space-y-2">
+              <Label>Bank Payment Type</Label>
+              <Select value={bankSubType} onValueChange={(value: 'net_banking' | 'cheque') => {
+                setBankSubType(value);
+                if (value !== 'cheque') {
+                  setChequeNo('');
+                  setChequeError('');
+                }
+              }}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="net_banking">Net Banking</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {paymentMode === 'bank' && bankSubType === 'cheque' && (
+            <div className="space-y-2">
+              <Label htmlFor="chequeNo">Cheque Number *</Label>
+              <Input
+                id="chequeNo"
+                type="text"
+                value={chequeNo}
+                onChange={(e) => {
+                  setChequeNo(e.target.value);
+                  setChequeError('');
+                }}
+                placeholder="Enter cheque number"
+                required
+              />
+              {chequeError && (
+                <p className="text-sm text-destructive">{chequeError}</p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
