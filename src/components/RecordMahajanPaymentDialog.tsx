@@ -103,7 +103,7 @@ export function RecordMahajanPaymentDialog({
         toast.error('Please enter cheque number');
         return;
       }
-      // Check duplicate cheque number
+      // Check duplicate cheque number in cheques table
       const { data: existingCheque } = await supabase
         .from('cheques')
         .select('id')
@@ -112,10 +112,35 @@ export function RecordMahajanPaymentDialog({
         .maybeSingle();
 
       if (existingCheque) {
-        setChequeError('This cheque number already exists');
+        setChequeError('This cheque number already exists in cheques');
         toast.error('Duplicate cheque number');
         return;
       }
+
+      // Also check partner_transactions notes for Cheque #XXXXX
+      const { data: partnerTxns } = await supabase
+        .from('partner_transactions')
+        .select('id, notes')
+        .ilike('notes', `%Cheque #${chequeNo.trim()}%`);
+
+      if (partnerTxns && partnerTxns.length > 0) {
+        setChequeError('This cheque number already used in a partner transaction');
+        toast.error('Duplicate cheque number');
+        return;
+      }
+
+      // Also check firm_transactions description
+      const { data: firmTxns } = await supabase
+        .from('firm_transactions')
+        .select('id, description')
+        .ilike('description', `%Cheque #${chequeNo.trim()}%`);
+
+      if (firmTxns && firmTxns.length > 0) {
+        setChequeError('This cheque number already used in a firm transaction');
+        toast.error('Duplicate cheque number');
+        return;
+      }
+
       setChequeError('');
     }
 
@@ -283,12 +308,12 @@ export function RecordMahajanPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[85vh] flex flex-col p-0">
-        <DialogHeader className="px-6 pt-6 pb-2">
+      <DialogContent className="max-w-md max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>Record Payment to {mahajanName}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="h-[calc(85vh-120px)] px-6">
-          <form id="payment-form" onSubmit={handleSubmit} className="space-y-4 pb-4">
+        <div className="flex-1 overflow-y-auto px-6">
+          <form id="payment-form" onSubmit={handleSubmit} className="space-y-4 pb-4 pt-1">
           <div className="space-y-2">
             <Label>Payment Source Type</Label>
             <Select value={sourceType} onValueChange={(value: 'partner' | 'firm') => {
@@ -354,7 +379,7 @@ export function RecordMahajanPaymentDialog({
               required
             />
             {parseFloat(amount) > outstandingBalance && outstandingBalance > 0 && (
-              <p className="text-sm text-yellow-600">
+              <p className="text-sm text-accent-foreground/80">
                 Overpayment of ₹{(parseFloat(amount) - outstandingBalance).toFixed(2)} will be recorded as advance
               </p>
             )}
@@ -444,8 +469,8 @@ export function RecordMahajanPaymentDialog({
           </div>
 
           </form>
-        </ScrollArea>
-        <div className="flex gap-2 px-6 py-4 border-t">
+        </div>
+        <div className="flex gap-2 px-6 py-4 border-t shrink-0">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
             Cancel
           </Button>
