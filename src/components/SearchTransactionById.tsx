@@ -220,6 +220,11 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
                       {t.source === 'bill' ? 'Bill Payment' : 'Advance Payment'}
                     </span>
                   </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {t.source === 'advance'
+                      ? getTransactionReference(t as AdvanceTransaction)
+                      : extractReferenceFromNotes(t.notes) || '—'}
+                  </TableCell>
                   <TableCell>₹{t.amount.toFixed(2)}</TableCell>
                   <TableCell>
                     {t.source === 'bill' ? (t as Transaction).transaction_type : 'advance'}
