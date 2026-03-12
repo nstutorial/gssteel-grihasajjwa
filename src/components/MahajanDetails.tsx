@@ -280,6 +280,32 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
       return;
     }
 
+    // Duplicate cheque check
+    if (paymentData.payment_mode === 'bank' && paymentData.cheque_no.trim()) {
+      const chequeNum = paymentData.cheque_no.trim();
+      const { data: existingCheques } = await supabase
+        .from('cheques')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('cheque_number', chequeNum);
+
+      if (existingCheques && existingCheques.length > 0) {
+        setChequeError('This cheque number already exists');
+        return;
+      }
+
+      const { data: partnerTxns } = await supabase
+        .from('partner_transactions')
+        .select('id')
+        .ilike('notes', `%Cheque #${chequeNum}%`);
+
+      if (partnerTxns && partnerTxns.length > 0) {
+        setChequeError('This cheque number already exists');
+        return;
+      }
+      setChequeError('');
+    }
+
     setLoading(true);
     try {
       // Generate 8-digit reference number
