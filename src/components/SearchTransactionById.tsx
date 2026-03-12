@@ -54,20 +54,28 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
     ...advanceTransactions.map(t => ({ ...t, source: 'advance' as const }))
   ];
 
-  // 🔍 Search by Reference Number only (8-digit payment reference)
+  // 🔍 Search by Reference Number (bill + advance)
   const handleSearch = () => {
-    const term = searchTerm.trim();
+    const term = normalizeReferenceSearchTerm(searchTerm);
+
     if (!term) {
       toast.error('Please enter a reference number');
       setFilteredTransactions([]);
       return;
     }
 
-    // Search only by reference number in notes field
     const result = allTransactions.filter((t) => {
-      const notes = t.notes || '';
-      // Look for REF#12345678 pattern
-      return notes.includes(`REF#${term}`);
+      const noteReference = extractReferenceFromNotes(t.notes);
+      if (noteReference && noteReference.includes(term)) {
+        return true;
+      }
+
+      if (t.source === 'advance') {
+        const advanceReference = getTransactionReference(t as AdvanceTransaction);
+        return advanceReference.includes(term);
+      }
+
+      return false;
     });
     
     if (result.length === 0) {
