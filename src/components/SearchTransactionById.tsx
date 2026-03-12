@@ -206,6 +206,7 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
                 <TableHead>Reference</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Transaction Type</TableHead>
+                <TableHead>Payment Date</TableHead>
                 <TableHead>Payment Mode</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead>Actions</TableHead>
