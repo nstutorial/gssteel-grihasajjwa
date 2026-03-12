@@ -311,6 +311,12 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
       // Generate 8-digit reference number
       const referenceNumber = Math.floor(10000000 + Math.random() * 90000000).toString();
       
+      // Build notes with cheque info
+      let enrichedNotes = paymentData.notes;
+      if (paymentData.payment_mode === 'bank' && paymentData.cheque_no.trim()) {
+        enrichedNotes = `Cheque #${paymentData.cheque_no.trim()}${paymentData.notes ? ' - ' + paymentData.notes : ''}`;
+      }
+      
       // Get all active bills sorted by bill_date (oldest first)
       const activeBills = bills
         .filter(b => b.is_active)
