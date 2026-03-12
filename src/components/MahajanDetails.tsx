@@ -28,6 +28,7 @@ import MahajanStatement from './MahajanStatement';
 import AddBillDialog from './AddBillDialog';
 import SearchBillbyRef from './SearchBillbyRef';
 import SearchTransactionById from './SearchTransactionById';
+import { formatReferenceForNotes } from '@/lib/transaction-reference';
 
 interface Mahajan {
   id: string;

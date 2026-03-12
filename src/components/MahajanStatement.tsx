@@ -11,6 +11,7 @@ import { Download, Calendar, IndianRupee, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import { saveAs } from "file-saver";
+import { getTransactionReference, stripReferencePrefix } from '@/lib/transaction-reference';
 
 
 interface Mahajan {

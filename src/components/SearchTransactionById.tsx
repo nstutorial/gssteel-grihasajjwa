@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from './ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { extractReferenceFromNotes, getTransactionReference, normalizeReferenceSearchTerm } from '@/lib/transaction-reference';
 
 interface Transaction {
   id: string;
