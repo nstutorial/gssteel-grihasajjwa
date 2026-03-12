@@ -758,76 +758,98 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
       {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-2">
             <DialogTitle>Record Payment</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handlePaymentSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Total Outstanding</Label>
-              <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(calculateTotalOutstanding())}
+          <div className="overflow-y-auto max-h-[calc(85vh-120px)] px-6">
+            <form onSubmit={handlePaymentSubmit} onKeyDown={(e) => { if (e.key === 'Enter' && e.target instanceof HTMLInputElement) e.preventDefault(); }} className="space-y-4 pb-4">
+              <div className="space-y-2">
+                <Label>Total Outstanding</Label>
+                <div className="text-2xl font-bold text-destructive">
+                  {formatCurrency(calculateTotalOutstanding())}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Payment will be applied to bills sequentially (oldest first), clearing interest before principal. Any overpayment will be stored as advance payment.
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Payment will be applied to bills sequentially (oldest first), clearing interest before principal. Any overpayment will be stored as advance payment.
-              </p>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="amount">Payment Amount</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                placeholder="Enter amount"
-                value={paymentData.amount}
-                onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
-                required
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount">Payment Amount</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="Enter amount"
+                  value={paymentData.amount}
+                  onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
+                  required
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="payment_date">Payment Date</Label>
-              <Input
-                id="payment_date"
-                type="date"
-                value={paymentData.payment_date}
-                onChange={(e) => setPaymentData({ ...paymentData, payment_date: e.target.value })}
-                required
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="payment_date">Payment Date</Label>
+                <Input
+                  id="payment_date"
+                  type="date"
+                  value={paymentData.payment_date}
+                  onChange={(e) => setPaymentData({ ...paymentData, payment_date: e.target.value })}
+                  required
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label>Payment Mode</Label>
-              <Select 
-                value={paymentData.payment_mode} 
-                onValueChange={(value: 'cash' | 'bank') => 
-                  setPaymentData({ ...paymentData, payment_mode: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="bank">Bank</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-2">
+                <Label>Payment Mode</Label>
+                <Select 
+                  value={paymentData.payment_mode} 
+                  onValueChange={(value: 'cash' | 'bank') => 
+                    setPaymentData({ ...paymentData, payment_mode: value, cheque_no: value === 'cash' ? '' : paymentData.cheque_no })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="bank">Bank</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes (Optional)</Label>
-              <Input
-                id="notes"
-                placeholder="Enter notes"
-                value={paymentData.notes}
-                onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
-              />
-            </div>
+              {paymentData.payment_mode === 'bank' && (
+                <div className="space-y-2">
+                  <Label htmlFor="cheque_no">Cheque No. (Optional)</Label>
+                  <Input
+                    id="cheque_no"
+                    placeholder="Enter cheque number"
+                    value={paymentData.cheque_no}
+                    onChange={(e) => {
+                      setPaymentData({ ...paymentData, cheque_no: e.target.value });
+                      setChequeError('');
+                    }}
+                  />
+                  {chequeError && (
+                    <p className="text-sm text-destructive">{chequeError}</p>
+                  )}
+                </div>
+              )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Recording...' : 'Record Payment'}
-            </Button>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes (Optional)</Label>
+                <Input
+                  id="notes"
+                  placeholder="Enter notes"
+                  value={paymentData.notes}
+                  onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Recording...' : 'Record Payment'}
+              </Button>
+            </form>
+          </div>
+        </DialogContent>
           </form>
         </DialogContent>
       </Dialog>
