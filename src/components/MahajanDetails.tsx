@@ -423,7 +423,9 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         payment_date: new Date().toISOString().split('T')[0],
         notes: '',
         payment_mode: 'cash',
+        cheque_no: '',
       });
+      setChequeError('');
       setShowPaymentDialog(false);
 
       fetchBillsAndTransactions();
