@@ -399,7 +399,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
               payment_mode: paymentData.payment_mode,
               notes: formatReferenceForNotes(
                 referenceNumber,
-                `${activeBills.length === 0 ? 'Direct advance payment' : 'Overpayment from bill payments'}${paymentData.notes ? ` - ${paymentData.notes}` : ''}`,
+                `${activeBills.length === 0 ? 'Direct advance payment' : 'Overpayment from bill payments'}${enrichedNotes ? ` - ${enrichedNotes}` : ''}`,
               ),
             });
         } catch (err) {
