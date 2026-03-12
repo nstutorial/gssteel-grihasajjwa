@@ -849,6 +849,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
               </Button>
             </form>
           </div>
+        </DialogContent>
       </Dialog>
 
       {/* Add Bill Dialog */}
