@@ -345,7 +345,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
               transaction_type: 'interest',
               payment_mode: paymentData.payment_mode,
               payment_date: paymentData.payment_date,
-              notes: `REF#${referenceNumber}${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
+              notes: `REF#${referenceNumber}${enrichedNotes ? ' - ' + enrichedNotes : ''}`,
             });
             remainingPayment -= interestPayment;
           }
