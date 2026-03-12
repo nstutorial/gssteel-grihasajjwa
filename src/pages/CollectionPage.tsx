@@ -64,6 +64,7 @@ const CollectionPage = ({ selectedDay }: CollectionPageProps) => {
     notes: string;
     transaction_type: 'principal' | 'interest' | 'mixed';
     payment_mode: 'cash' | 'bank';
+    firm_account_id: string;
   }}>({});
   
   const [editingPayments, setEditingPayments] = useState<{[key: string]: {
@@ -78,6 +79,7 @@ const CollectionPage = ({ selectedDay }: CollectionPageProps) => {
   const [paymentErrors, setPaymentErrors] = useState<{[key: string]: string}>({});
   const [confirmedTransactions, setConfirmedTransactions] = useState<{[key: string]: boolean}>({});
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [firmAccounts, setFirmAccounts] = useState<Array<{ id: string; account_name: string }>>([]);
 
   const dayLabels = {
     sunday: 'Sunday',
@@ -92,8 +94,25 @@ const CollectionPage = ({ selectedDay }: CollectionPageProps) => {
   useEffect(() => {
     if (user) {
       fetchCustomers();
+      fetchFirmAccounts();
     }
   }, [user]);
+
+  const fetchFirmAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('firm_accounts')
+        .select('id, account_name')
+        .eq('user_id', user?.id)
+        .eq('is_active', true)
+        .order('account_name');
+
+      if (error) throw error;
+      setFirmAccounts(data || []);
+    } catch (error) {
+      console.error('Error fetching firm accounts:', error);
+    }
+  };
 
   const fetchCustomers = async () => {
     try {
@@ -426,6 +445,29 @@ const CollectionPage = ({ selectedDay }: CollectionPageProps) => {
 
       if (error) throw error;
 
+      // If firm account is selected, create a firm transaction
+      if (customerPaymentData.firm_account_id) {
+        const { error: firmError } = await supabase
+          .from('firm_transactions')
+          .insert({
+            firm_account_id: customerPaymentData.firm_account_id,
+            transaction_type: 'income',
+            transaction_sub_type: 'loan_payment',
+            amount: parseFloat(customerPaymentData.amount),
+            transaction_date: new Date().toISOString().split('T')[0],
+            description: `Loan payment from ${customer.name} (Loan #${activeLoan.id.slice(0, 8)})`,
+          });
+
+        if (firmError) {
+          console.error('Error creating firm transaction:', firmError);
+          toast({
+            variant: "destructive",
+            title: "Warning",
+            description: "Payment recorded but failed to update firm account",
+          });
+        }
+      }
+
       toast({
         title: "Payment Recorded",
         description: `Payment of ₹${customerPaymentData.amount} recorded for ${customer.name}`,
@@ -438,7 +480,8 @@ const CollectionPage = ({ selectedDay }: CollectionPageProps) => {
           amount: '',
           notes: '',
           transaction_type: 'mixed',
-          payment_mode: 'cash'
+          payment_mode: 'cash',
+          firm_account_id: ''
         }
       }));
 
@@ -741,7 +784,8 @@ const CollectionPage = ({ selectedDay }: CollectionPageProps) => {
       amount: '',
       notes: '',
       transaction_type: 'mixed' as 'principal' | 'interest' | 'mixed',
-      payment_mode: 'cash' as 'cash' | 'bank'
+      payment_mode: 'cash' as 'cash' | 'bank',
+      firm_account_id: ''
     };
   };
 
@@ -1918,6 +1962,24 @@ const CollectionPage = ({ selectedDay }: CollectionPageProps) => {
                                   onChange={(e) => updatePaymentData(customer.id, 'notes', e.target.value)}
                                 />
                               </div>
+                            </div>
+                            <div>
+                              <Label htmlFor={`firm-account-${customer.id}`}>Credit Account (Optional)</Label>
+                              <Select
+                                value={customerPaymentData.firm_account_id}
+                                onValueChange={(value) => updatePaymentData(customer.id, 'firm_account_id', value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select account (optional)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {firmAccounts.map((account) => (
+                                    <SelectItem key={account.id} value={account.id}>
+                                      {account.account_name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
                             
                             <Button 

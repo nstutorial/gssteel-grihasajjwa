@@ -8,10 +8,18 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Settings as SettingsIcon, Mail, Edit3, Shield, Lock, BarChart3, Unlock } from 'lucide-react';
+import { ArrowLeft, Settings as SettingsIcon, Mail, Edit3, Shield, Lock, BarChart3, Unlock, Home } from 'lucide-react';
 import { useControl } from '@/contexts/ControlContext';
 import { CustomTransactionTypeContent } from '@/components/CustomTransactionTypeContent';
 
@@ -22,7 +30,19 @@ export interface TabSettings {
   bill_customers: boolean;
   daywise: boolean;
   payments: boolean;
+  home_route?: string;
 }
+
+const HOME_ROUTE_OPTIONS = [
+  { value: '/firm-accounts', label: 'Firm Accounts' },
+  { value: '/dashboard', label: 'Dashboard' },
+  { value: '/reminders', label: 'Loan Reminders' },
+  { value: '/bill-reminders', label: 'Bill Reminders' },
+  { value: '/bill-customers', label: 'Bill Customers' },
+  { value: '/partners', label: 'Partners' },
+  { value: '/cheques', label: 'Cheques' },
+  { value: '/tasks', label: 'Tasks' },
+];
 
 export interface ControlSettings {
   allowEdit: boolean;
@@ -52,6 +72,7 @@ const Settings = () => {
     bill_customers: true,
     daywise: true,
     payments: true,
+    home_route: '/firm-accounts',
   });
   const [controlSettings, setControlSettings] = useState<ControlSettings>({
     allowEdit: true,
@@ -376,13 +397,18 @@ const Settings = () => {
       }
 
       if (data) {
-        const settings = (data as any)?.visible_tabs as unknown as TabSettings;
-        // Ensure mahajans field exists, default to true if missing
-        const settingsWithMahajans = {
-          ...settings,
-          mahajans: settings.mahajans !== undefined ? settings.mahajans : true
+        const fetchedSettings = (data as any)?.visible_tabs as unknown as TabSettings;
+        // Ensure all fields exist with defaults
+        const mergedSettings: TabSettings = {
+          loans: fetchedSettings.loans ?? true,
+          customers: fetchedSettings.customers ?? true,
+          mahajans: fetchedSettings.mahajans ?? true,
+          bill_customers: fetchedSettings.bill_customers ?? true,
+          daywise: fetchedSettings.daywise ?? true,
+          payments: fetchedSettings.payments ?? true,
+          home_route: fetchedSettings.home_route ?? '/firm-accounts',
         };
-        setSettings(settingsWithMahajans);
+        setSettings(mergedSettings);
         
         // Try to load control settings from database
         const defaultControlSettings = {
@@ -414,13 +440,14 @@ const Settings = () => {
         }
       } else {
         // If no settings exist, use defaults and create them
-        const defaultSettings = {
+        const defaultSettings: TabSettings = {
           loans: true,
           customers: true,
           mahajans: true,
           daywise: true,
           payments: true,
           bill_customers: true,
+          home_route: '/firm-accounts',
         };
         
         const defaultControls = {
@@ -447,7 +474,7 @@ const Settings = () => {
           .from('user_settings')
           .insert({
             user_id: user.id,
-            visible_tabs: defaultSettings,
+            visible_tabs: defaultSettings as unknown as Json,
           });
           
         if (insertError) {
@@ -497,7 +524,7 @@ const Settings = () => {
         const { error: updateError } = await supabase
           .from('user_settings')
           .update({
-            visible_tabs: newSettings,
+            visible_tabs: newSettings as unknown as Json,
             updated_at: new Date().toISOString(),
           })
           .eq('user_id', user.id);
@@ -508,7 +535,7 @@ const Settings = () => {
           .from('user_settings')
           .insert({
             user_id: user.id,
-            visible_tabs: newSettings,
+            visible_tabs: newSettings as unknown as Json,
           });
         error = insertError;
       }
@@ -531,6 +558,49 @@ const Settings = () => {
     } catch (error) {
       console.error('Unexpected error updating settings:', error);
       // Revert the local state on error
+      setSettings(settings);
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred while updating settings',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleHomeRouteChange = async (value: string) => {
+    if (!user || isUpdating) return;
+
+    const newSettings = { ...settings, home_route: value };
+    setSettings(newSettings);
+    setIsUpdating(true);
+
+    try {
+      const { error } = await supabase
+        .from('user_settings')
+        .update({
+          visible_tabs: newSettings as unknown as Json,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Settings update error:', error);
+        setSettings(settings);
+        toast({
+          title: 'Error',
+          description: `Failed to update home page: ${error.message}`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: 'Home page updated successfully',
+        });
+      }
+    } catch (error) {
+      console.error('Unexpected error updating settings:', error);
       setSettings(settings);
       toast({
         title: 'Error',
@@ -992,6 +1062,45 @@ const Settings = () => {
             </CardContent>
           </Card>
 
+          {/* Home Page Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Home className="h-5 w-5" />
+                Home Page Settings
+              </CardTitle>
+              <CardDescription>
+                Choose which page to show when you open the app
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1">
+                  <Label className="text-base font-medium">Default Home Page</Label>
+                  <p className="text-sm text-muted-foreground">
+                    This page will open when you start the app
+                  </p>
+                </div>
+                <Select
+                  value={settings.home_route || '/firm-accounts'}
+                  onValueChange={handleHomeRouteChange}
+                  disabled={isUpdating}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Select home page" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HOME_ROUTE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Tab Visibility Settings */}
           <Card>
             <CardHeader>
@@ -1002,23 +1111,26 @@ const Settings = () => {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-4">
-                {Object.entries(settings).map(([key, value]) => (
+                {Object.entries(settings)
+                  .filter(([key]) => key !== 'home_route')
+                  .map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="space-y-1">
                       <Label htmlFor={key} className="capitalize text-base font-medium">
-                        {key === 'daywise' ? 'Daywise Payment' : key}
+                        {key === 'daywise' ? 'Daywise Payment' : key === 'bill_customers' ? 'Bill Customers' : key}
                       </Label>
                       <p className="text-sm text-muted-foreground">
                         {key === 'loans' && 'Manage loans and repayments'}
                         {key === 'customers' && 'Customer management and details'}
                         {key === 'mahajans' && 'Mahajan management and bill tracking'}
+                        {key === 'bill_customers' && 'Bill customer management'}
                         {key === 'daywise' && 'Daily payment schedule overview'}
                         {key === 'payments' && 'Payment history and tracking'}
                       </p>
                     </div>
                     <Switch
                       id={key}
-                      checked={value}
+                      checked={value as boolean}
                       disabled={isUpdating}
                       onCheckedChange={() => handleToggle(key as keyof TabSettings)}
                     />

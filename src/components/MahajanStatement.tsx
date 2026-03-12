@@ -432,19 +432,10 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
     advancePaymentTransactions.forEach(advanceTrans => {
       const transDate = new Date(advanceTrans.payment_date);
       const isInRange = (!startDate || transDate >= new Date(startDate)) && 
-                        (!endDate || transDate <= new Date(endDate));
+                       (!endDate || transDate <= new Date(endDate));
 
       if (isInRange) {
         let description = 'Advance Payment';
-        
-        // Extract reference number from notes
-        let referenceNumber = '';
-        if (advanceTrans.notes) {
-          const refMatch = advanceTrans.notes.match(/REF#(\d{8})/);
-          if (refMatch) {
-            referenceNumber = refMatch[1];
-          }
-        }
         
         // If this is from a partner payment, format it specially
         if (advanceTrans.notes?.includes('Overpayment from partner payment')) {
@@ -459,7 +450,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
         allEntries.push({
           date: advanceTrans.payment_date,
           description,
-          reference: referenceNumber || `ADV-${advanceTrans.id.slice(0, 8)}`,
+          reference: 'ADVANCE',
           debit: 0,
           credit: advanceTrans.amount,
           balance: 0, // Will be calculated after sorting

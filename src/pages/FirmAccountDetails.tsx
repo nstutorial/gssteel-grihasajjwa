@@ -498,24 +498,30 @@ export default function FirmAccountDetails() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/firm-accounts')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-3xl font-bold">Account Statement - {account.account_name}</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate('/transaction-types')}>
-            <Plus className="h-4 w-4 mr-2" />
-            Manage Types
-          </Button>
-          <Button onClick={() => setSendMoneyDialogOpen(true)}>
-            <Send className="h-4 w-4 mr-2" />
-            Send Money
-          </Button>
-        </div>
-      </div>
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
+  {/* Left Section */}
+  <div className="flex items-center gap-4">
+    <Button variant="ghost" size="icon" onClick={() => navigate('/firm-accounts')}>
+      <ArrowLeft className="h-5 w-5" />
+    </Button>
+    <h1 className="text-3xl font-bold">
+      Account Statement - {account.account_name}
+    </h1>
+  </div>
+
+  {/* Right Section (Buttons) */}
+  <div className="flex gap-2 self-start md:self-auto">
+    <Button variant="outline" onClick={() => navigate('/transaction-types')}>
+      <Plus className="h-4 w-4 mr-2" />
+      Manage Types
+    </Button>
+    <Button onClick={() => setSendMoneyDialogOpen(true)}>
+      <Send className="h-4 w-4 mr-2" />
+      Send Money
+    </Button>
+  </div>
+</div>
+
 
       <Card className="mb-6">
         <CardHeader>

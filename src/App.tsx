@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ControlProvider } from "./contexts/ControlContext";
 import { useBackButton } from "./hooks/use-back-button";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
@@ -60,6 +62,66 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Home Redirect Component - redirects to user's configured home page
+const HomeRedirect = () => {
+  const { user, loading } = useAuth();
+  const [homeRoute, setHomeRoute] = useState<string | null>(null);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+
+  useEffect(() => {
+    const fetchHomeRoute = async () => {
+      if (!user) {
+        setLoadingSettings(false);
+        return;
+      }
+
+      try {
+        const { data } = await supabase
+          .from('user_settings')
+          .select('visible_tabs')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (data?.visible_tabs) {
+          const settings = data.visible_tabs as { home_route?: string };
+          setHomeRoute(settings.home_route || '/firm-accounts');
+        } else {
+          setHomeRoute('/firm-accounts');
+        }
+      } catch {
+        setHomeRoute('/firm-accounts');
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+
+    if (!loading) {
+      fetchHomeRoute();
+    }
+  }, [user, loading]);
+
+  if (loading || loadingSettings) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (homeRoute) {
+    return <Navigate to={homeRoute} replace />;
+  }
+
+  return <Navigate to="/firm-accounts" replace />;
+};
+
 // Public Route Component (redirects to dashboard if already authenticated)
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -88,7 +150,8 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      <Route path="/" element={
+      <Route path="/" element={<HomeRedirect />} />
+      <Route path="/dashboard" element={
         <ProtectedRoute>
           <Dashboard />
         </ProtectedRoute>

@@ -80,11 +80,15 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
     paymentType: 'principal' as 'principal' | 'interest' | 'mixed',
     notes: '',
     payment_mode: 'cash' as 'cash' | 'bank',
+    firm_account_id: '',
   });
+
+  const [firmAccounts, setFirmAccounts] = useState<Array<{ id: string; account_name: string }>>([]);
 
   useEffect(() => {
     if (user) {
       fetchLoans();
+      fetchFirmAccounts();
     }
   }, [user, customer.id]);
 
@@ -93,6 +97,21 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
       fetchTransactions();
     }
   }, [user, loans]);
+
+  const fetchFirmAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('firm_accounts')
+        .select('id, account_name')
+        .eq('is_active', true)
+        .order('account_name');
+
+      if (error) throw error;
+      setFirmAccounts(data || []);
+    } catch (error: any) {
+      console.error('Error fetching firm accounts:', error);
+    }
+  };
 
   const fetchLoans = async () => {
     try {
@@ -136,17 +155,45 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
 
     setLoading(true);
     try {
+      const paymentAmount = parseFloat(paymentData.amount);
+      
       const { error } = await supabase
         .from('loan_transactions')
         .insert({
           loan_id: selectedLoanId,
-          amount: parseFloat(paymentData.amount),
+          amount: paymentAmount,
           transaction_type: paymentData.paymentType,
           payment_mode: paymentData.payment_mode,
           notes: paymentData.notes || null,
         });
 
       if (error) throw error;
+
+      // If firm account is selected, create a firm transaction
+      if (paymentData.firm_account_id) {
+        const selectedLoan = loans.find(l => l.id === selectedLoanId);
+        const loanDescription = selectedLoan?.description || 'Loan';
+        
+        const { error: firmError } = await supabase
+          .from('firm_transactions')
+          .insert({
+            firm_account_id: paymentData.firm_account_id,
+            transaction_type: 'income',
+            transaction_sub_type: 'loan_payment',
+            amount: paymentAmount,
+            transaction_date: new Date().toISOString().split('T')[0],
+            description: `Loan payment from ${customer.name} (${loanDescription}): ${paymentData.paymentType} payment${paymentData.notes ? ' - ' + paymentData.notes : ''}`
+          });
+
+        if (firmError) {
+          console.error('Error creating firm transaction:', firmError);
+          toast({
+            title: "Warning",
+            description: "Payment recorded but failed to update firm account",
+            variant: "destructive",
+          });
+        }
+      }
 
       toast({
         title: "Payment recorded",
@@ -161,6 +208,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
         paymentType: 'principal',
         notes: '',
         payment_mode: 'cash',
+        firm_account_id: '',
       });
       
       setShowPaymentDialog(false);
@@ -449,6 +497,27 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="bank">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Credit to Firm Account (Optional)</Label>
+              <Select 
+                value={paymentData.firm_account_id} 
+                onValueChange={(value: string) => 
+                  setPaymentData({ ...paymentData, firm_account_id: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {firmAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.account_name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

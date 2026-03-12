@@ -84,11 +84,15 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
     type: 'mixed' as 'principal' | 'interest' | 'mixed',
     notes: '',
     payment_mode: 'cash' as 'cash' | 'bank',
+    firm_account_id: '',
   });
+
+  const [firmAccounts, setFirmAccounts] = useState<Array<{ id: string; account_name: string }>>([]);
 
   useEffect(() => {
     if (user) {
       fetchLoans();
+      fetchFirmAccounts();
     }
   }, [user]);
 
@@ -100,6 +104,21 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
     window.addEventListener('refresh-loans', handleRefresh);
     return () => window.removeEventListener('refresh-loans', handleRefresh);
   }, []);
+
+  const fetchFirmAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('firm_accounts')
+        .select('id, account_name')
+        .eq('is_active', true)
+        .order('account_name');
+
+      if (error) throw error;
+      setFirmAccounts(data || []);
+    } catch (error: any) {
+      console.error('Error fetching firm accounts:', error);
+    }
+  };
 
   const fetchLoans = async () => {
     try {
@@ -249,12 +268,38 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
 
       if (error) throw error;
 
+      // If firm account is selected, create a firm transaction
+      if (paymentData.firm_account_id) {
+        const customerName = selectedLoan.customers.name;
+        const loanNumber = selectedLoan.loan_number;
+        
+        const { error: firmError } = await supabase
+          .from('firm_transactions')
+          .insert({
+            firm_account_id: paymentData.firm_account_id,
+            transaction_type: 'income',
+            transaction_sub_type: 'loan_payment',
+            amount: paymentAmount,
+            transaction_date: new Date().toISOString().split('T')[0],
+            description: `Loan payment from ${customerName} (Loan #${loanNumber}): Interest ₹${interestPayment.toFixed(2)}, Principal ₹${principalPayment.toFixed(2)}${paymentData.notes ? ' - ' + paymentData.notes : ''}`
+          });
+
+        if (firmError) {
+          console.error('Error creating firm transaction:', firmError);
+          toast({
+            title: "Warning",
+            description: "Payment recorded but failed to update firm account",
+            variant: "destructive",
+          });
+        }
+      }
+
       toast({
         title: "Payment recorded",
         description: `₹${paymentAmount.toFixed(2)} recorded (Interest: ₹${interestPayment.toFixed(2)}, Principal: ₹${principalPayment.toFixed(2)})`,
       });
 
-      setPaymentData({ amount: '', type: 'mixed', notes: '', payment_mode: 'cash' });
+      setPaymentData({ amount: '', type: 'mixed', notes: '', payment_mode: 'cash', firm_account_id: '' });
       setShowPaymentDialog(false);
       await fetchLoans();
       await fetchTransactions(selectedLoan.id);
@@ -875,6 +920,25 @@ Generated on: ${new Date().toLocaleDateString()}
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="bank">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Credit to Firm Account (Optional)</Label>
+              <Select 
+                value={paymentData.firm_account_id} 
+                onValueChange={(value: string) => setPaymentData({ ...paymentData, firm_account_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {firmAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.account_name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
