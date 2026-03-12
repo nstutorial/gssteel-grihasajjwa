@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from './ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { extractReferenceFromNotes, getTransactionReference, normalizeReferenceSearchTerm } from '@/lib/transaction-reference';
 
 interface Transaction {
   id: string;
@@ -53,20 +54,28 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
     ...advanceTransactions.map(t => ({ ...t, source: 'advance' as const }))
   ];
 
-  // 🔍 Search by Reference Number only (8-digit payment reference)
+  // 🔍 Search by Reference Number (bill + advance)
   const handleSearch = () => {
-    const term = searchTerm.trim();
+    const term = normalizeReferenceSearchTerm(searchTerm);
+
     if (!term) {
       toast.error('Please enter a reference number');
       setFilteredTransactions([]);
       return;
     }
 
-    // Search only by reference number in notes field
     const result = allTransactions.filter((t) => {
-      const notes = t.notes || '';
-      // Look for REF#12345678 pattern
-      return notes.includes(`REF#${term}`);
+      const noteReference = extractReferenceFromNotes(t.notes);
+      if (noteReference && noteReference.includes(term)) {
+        return true;
+      }
+
+      if (t.source === 'advance') {
+        const advanceReference = getTransactionReference(t as AdvanceTransaction);
+        return advanceReference.includes(term);
+      }
+
+      return false;
     });
     
     if (result.length === 0) {
@@ -194,6 +203,7 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
               <TableRow>
                 <TableHead>Transaction ID</TableHead>
                 <TableHead>Source</TableHead>
+                <TableHead>Reference</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Transaction Type</TableHead>
                 <TableHead>Payment Date</TableHead>
@@ -210,6 +220,11 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
                     <span className={t.source === 'bill' ? 'text-blue-600' : 'text-green-600'}>
                       {t.source === 'bill' ? 'Bill Payment' : 'Advance Payment'}
                     </span>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {t.source === 'advance'
+                      ? getTransactionReference(t as AdvanceTransaction)
+                      : extractReferenceFromNotes(t.notes) || '—'}
                   </TableCell>
                   <TableCell>₹{t.amount.toFixed(2)}</TableCell>
                   <TableCell>

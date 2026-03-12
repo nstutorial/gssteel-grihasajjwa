@@ -28,6 +28,7 @@ import MahajanStatement from './MahajanStatement';
 import AddBillDialog from './AddBillDialog';
 import SearchBillbyRef from './SearchBillbyRef';
 import SearchTransactionById from './SearchTransactionById';
+import { formatReferenceForNotes } from '@/lib/transaction-reference';
 
 interface Mahajan {
   id: string;
@@ -362,9 +363,10 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
               amount: remainingPayment,
               payment_date: paymentData.payment_date,
               payment_mode: paymentData.payment_mode,
-              notes: activeBills.length === 0 
-                ? `Direct advance payment${paymentData.notes ? ' - ' + paymentData.notes : ''}`
-                : `Overpayment from bill payments${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
+              notes: formatReferenceForNotes(
+                referenceNumber,
+                `${activeBills.length === 0 ? 'Direct advance payment' : 'Overpayment from bill payments'}${paymentData.notes ? ` - ${paymentData.notes}` : ''}`,
+              ),
             });
         } catch (err) {
           console.log('Advance payment transaction table not available yet');

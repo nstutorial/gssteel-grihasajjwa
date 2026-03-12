@@ -11,6 +11,7 @@ import { Download, Calendar, IndianRupee, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import { saveAs } from "file-saver";
+import { getTransactionReference, stripReferencePrefix } from '@/lib/transaction-reference';
 
 
 interface Mahajan {
@@ -435,22 +436,24 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
                        (!endDate || transDate <= new Date(endDate));
 
       if (isInRange) {
+        const cleanNotes = stripReferencePrefix(advanceTrans.notes);
+        const referenceNumber = getTransactionReference(advanceTrans);
         let description = 'Advance Payment';
         
         // If this is from a partner payment, format it specially
-        if (advanceTrans.notes?.includes('Overpayment from partner payment')) {
-          const partnerMatch = advanceTrans.notes.match(/FROM\s+([^-]+?)(?:\s*-\s*(.+))?$/);
+        if (cleanNotes.includes('Overpayment from partner payment')) {
+          const partnerMatch = cleanNotes.match(/FROM\s+([^-]+?)(?:\s*-\s*(.+))?$/);
           const partnerName = partnerMatch ? partnerMatch[1].trim() : 'Partner';
           const additionalNotes = partnerMatch?.[2]?.trim();
           description = `Advance Payment (Overpayment from ${partnerName})${additionalNotes ? ' - ' + additionalNotes : ''}`;
-        } else if (advanceTrans.notes) {
-          description = `Advance Payment - ${advanceTrans.notes}`;
+        } else if (cleanNotes) {
+          description = `Advance Payment - ${cleanNotes}`;
         }
         
         allEntries.push({
           date: advanceTrans.payment_date,
           description,
-          reference: 'ADVANCE',
+          reference: referenceNumber,
           debit: 0,
           credit: advanceTrans.amount,
           balance: 0, // Will be calculated after sorting
