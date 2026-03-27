@@ -572,7 +572,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
                   {formatCurrency(calculateTotalOutstanding())}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Payment will be applied to bills sequentially (oldest first), clearing interest before principal. Any overpayment will be stored as advance payment.
+                  Payment will be applied to bills sequentially (oldest first), clearing interest before principal. Any overpayment will be visible in the statement.
                 </p>
               </div>
 
