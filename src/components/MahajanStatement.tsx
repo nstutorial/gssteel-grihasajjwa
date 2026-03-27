@@ -68,13 +68,6 @@ interface PartnerTransaction {
   } | null;
 }
 
-interface AdvancePaymentTransaction {
-  id: string;
-  amount: number;
-  payment_date: string;
-  payment_mode: string;
-  notes: string | null;
-}
 
 interface StatementEntry {
   date: string;
@@ -83,7 +76,7 @@ interface StatementEntry {
   debit: number;
   credit: number;
   balance: number;
-  type: 'bill_disbursement' | 'payment_paid' | 'interest_accrued' | 'firm_payment' | 'partner_payment' | 'advance_payment';
+  type: 'bill_disbursement' | 'payment_paid' | 'interest_accrued' | 'firm_payment' | 'partner_payment';
 }
 
 interface MahajanStatementProps {
@@ -97,7 +90,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
   const [transactions, setTransactions] = useState<BillTransaction[]>([]);
   const [firmTransactions, setFirmTransactions] = useState<FirmTransaction[]>([]);
   const [partnerTransactions, setPartnerTransactions] = useState<PartnerTransaction[]>([]);
-  const [advancePaymentTransactions, setAdvancePaymentTransactions] = useState<AdvancePaymentTransaction[]>([]);
+  
   const [statement, setStatement] = useState<StatementEntry[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -150,21 +143,6 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       )
       .subscribe();
 
-    const advancePaymentTransactionsChannel = supabase
-      .channel('mahajan-advance-payment-transactions-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'advance_payment_transactions',
-          filter: `mahajan_id=eq.${mahajan.id}`
-        },
-        () => {
-          fetchMahajanData();
-        }
-      )
-      .subscribe();
 
     const firmTransactionsChannel = supabase
       .channel('mahajan-statement-firm-transactions-changes')
@@ -185,7 +163,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
     return () => {
       supabase.removeChannel(partnerTransactionsChannel);
       supabase.removeChannel(billTransactionsChannel);
-      supabase.removeChannel(advancePaymentTransactionsChannel);
+      
       supabase.removeChannel(firmTransactionsChannel);
     };
   }, [mahajan.id]);
@@ -225,22 +203,6 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
 
       if (partnerTransError) throw partnerTransError;
 
-      // Fetch advance payment transactions for this mahajan
-      let advancePaymentTransData: AdvancePaymentTransaction[] = [];
-      try {
-        const { data, error: advancePaymentTransError } = await supabase
-          .from('advance_payment_transactions' as any)
-          .select('*')
-          .eq('mahajan_id', mahajan.id)
-          .order('payment_date', { ascending: true });
-
-        if (!advancePaymentTransError && data) {
-          advancePaymentTransData = data as unknown as AdvancePaymentTransaction[];
-        }
-      } catch (err) {
-        // Table might not exist yet
-        console.log('Advance payment transactions table not available yet');
-      }
 
       let transactionsData: BillTransaction[] = [];
 
@@ -264,7 +226,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       setBills(billsData || []);
       setFirmTransactions(firmTransData || []);
       setPartnerTransactions(partnerTransData || []);
-      setAdvancePaymentTransactions(advancePaymentTransData);
+      
 
     } catch (error) {
       console.error('Error fetching mahajan data:', error);
@@ -396,64 +358,22 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       }
     });
 
-    // Add partner transactions (only if they didn't result in advance payment)
+    // Add partner transactions
     partnerTransactions.forEach(partnerTrans => {
       const transDate = new Date(partnerTrans.payment_date);
       const isInRange = (!startDate || transDate >= new Date(startDate)) && 
                        (!endDate || transDate <= new Date(endDate));
 
       if (isInRange) {
-        // Check if there's a corresponding advance payment transaction on the same date
-        const hasAdvancePayment = advancePaymentTransactions.some(advTrans => 
-          advTrans.payment_date === partnerTrans.payment_date &&
-          advTrans.notes?.includes('Overpayment from partner payment')
-        );
-
-        // Only show partner transaction if it didn't result in advance payment
-        if (!hasAdvancePayment) {
-          const partnerName = partnerTrans.partners?.name || 'Unknown Partner';
-          allEntries.push({
-            date: partnerTrans.payment_date,
-            description: `Partner Payment from ${partnerName}${partnerTrans.notes ? ' - ' + partnerTrans.notes : ''}`,
-            reference: 'PARTNER',
-            debit: 0,
-            credit: partnerTrans.amount,
-            balance: 0, // Will be calculated after sorting
-            type: 'partner_payment'
-          });
-        }
-      }
-    });
-
-    // Add advance payment transactions
-    advancePaymentTransactions.forEach(advanceTrans => {
-      const transDate = new Date(advanceTrans.payment_date);
-      const isInRange = (!startDate || transDate >= new Date(startDate)) && 
-                       (!endDate || transDate <= new Date(endDate));
-
-      if (isInRange) {
-        const cleanNotes = stripReferencePrefix(advanceTrans.notes);
-        const referenceNumber = getTransactionReference(advanceTrans);
-        let description = 'Advance Payment';
-        
-        // If this is from a partner payment, format it specially
-        if (cleanNotes.includes('Overpayment from partner payment')) {
-          const partnerMatch = cleanNotes.match(/FROM\s+([^-]+?)(?:\s*-\s*(.+))?$/);
-          const partnerName = partnerMatch ? partnerMatch[1].trim() : 'Partner';
-          const additionalNotes = partnerMatch?.[2]?.trim();
-          description = `Advance Payment (Overpayment from ${partnerName})${additionalNotes ? ' - ' + additionalNotes : ''}`;
-        } else if (cleanNotes) {
-          description = `Advance Payment - ${cleanNotes}`;
-        }
-        
+        const partnerName = partnerTrans.partners?.name || 'Unknown Partner';
         allEntries.push({
-          date: advanceTrans.payment_date,
-          description,
-          reference: referenceNumber,
+          date: partnerTrans.payment_date,
+          description: `Partner Payment from ${partnerName}${partnerTrans.notes ? ' - ' + partnerTrans.notes : ''}`,
+          reference: 'PARTNER',
           debit: 0,
-          credit: advanceTrans.amount,
-          balance: 0, // Will be calculated after sorting
-          type: 'advance_payment'
+          credit: partnerTrans.amount,
+          balance: 0,
+          type: 'partner_payment'
         });
       }
     });
@@ -466,7 +386,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       if (entry.type === 'bill_disbursement') {
         entry.balance = runningBalance + entry.debit;
         runningBalance += entry.debit;
-      } else if (entry.type === 'payment_paid' || entry.type === 'firm_payment' || entry.type === 'partner_payment' || entry.type === 'advance_payment') {
+      } else if (entry.type === 'payment_paid' || entry.type === 'firm_payment' || entry.type === 'partner_payment') {
         entry.balance = runningBalance - entry.credit;
         runningBalance -= entry.credit;
       }
@@ -782,7 +702,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
                 <div className="text-2xl font-bold text-purple-600">
                   {formatCurrency(Math.abs(calculateStatementOutstanding()))}
                 </div>
-                <div className="text-sm text-purple-600">Advance Payment</div>
+                <div className="text-sm text-purple-600">Overpaid</div>
               </div>
             )}
             <div className="text-center p-4 bg-blue-50 rounded-lg">
