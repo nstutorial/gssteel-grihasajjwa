@@ -536,10 +536,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
 
     // ---------------- HEADER ----------------
     doc.setFontSize(16).setFont("helvetica", "bold");
-    doc.text("Mahajan Statement", pageWidth / 2, 20, { align: "center" });
-
-    doc.setFontSize(14);
-    doc.text(mahajan.name, pageWidth / 2, 30, { align: "center" });
+    doc.text(`Account Statement for ${mahajan.name}`, pageWidth / 2, 20, { align: "center" });
 
     doc.setLineWidth(0.5);
     doc.line(30, 35, pageWidth - 30, 35);
