@@ -176,44 +176,6 @@ export function RecordMahajanPaymentDialog({
   };
 
   const handlePartnerPayment = async (paymentAmount: number, finalNotes: string) => {
-    const partner = partners.find(p => p.id === selectedSourceId);
-    
-    if (outstandingBalance <= 0 || paymentAmount > outstandingBalance) {
-      const advanceAmount = outstandingBalance <= 0 ? paymentAmount : paymentAmount - outstandingBalance;
-      
-      const notesText = finalNotes 
-        ? `Overpayment from partner payment FROM ${partner?.name} - ${finalNotes}`
-        : `Overpayment from partner payment FROM ${partner?.name}`;
-
-      const { error: advanceError } = await supabase
-        .from('advance_payment_transactions')
-        .insert({
-          user_id: user?.id,
-          mahajan_id: mahajanId,
-          amount: advanceAmount,
-          payment_date: paymentDate,
-          payment_mode: paymentMode,
-          notes: notesText,
-        });
-
-      if (advanceError) throw advanceError;
-
-      const { data: currentMahajan } = await supabase
-        .from('mahajans')
-        .select('advance_payment')
-        .eq('id', mahajanId)
-        .single();
-
-      const { error: mahajanError } = await supabase
-        .from('mahajans')
-        .update({
-          advance_payment: (currentMahajan?.advance_payment || 0) + advanceAmount,
-        })
-        .eq('id', mahajanId);
-
-      if (mahajanError) throw mahajanError;
-    }
-
     const { error: partnerTxnError } = await supabase
       .from('partner_transactions')
       .insert({
@@ -257,41 +219,6 @@ export function RecordMahajanPaymentDialog({
 
     if (updateError) throw updateError;
 
-    if (outstandingBalance <= 0 || paymentAmount > outstandingBalance) {
-      const advanceAmount = outstandingBalance <= 0 ? paymentAmount : paymentAmount - outstandingBalance;
-      
-      const notesText = finalNotes 
-        ? `Overpayment from firm account FROM ${firmAccount?.account_name} - ${finalNotes}`
-        : `Overpayment from firm account FROM ${firmAccount?.account_name}`;
-
-      const { error: advanceError } = await supabase
-        .from('advance_payment_transactions')
-        .insert({
-          user_id: user?.id,
-          mahajan_id: mahajanId,
-          amount: advanceAmount,
-          payment_date: paymentDate,
-          payment_mode: paymentMode,
-          notes: notesText,
-        });
-
-      if (advanceError) throw advanceError;
-
-      const { data: currentMahajan } = await supabase
-        .from('mahajans')
-        .select('advance_payment')
-        .eq('id', mahajanId)
-        .single();
-
-      const { error: mahajanError } = await supabase
-        .from('mahajans')
-        .update({
-          advance_payment: (currentMahajan?.advance_payment || 0) + advanceAmount,
-        })
-        .eq('id', mahajanId);
-
-      if (mahajanError) throw mahajanError;
-    }
   };
 
   const resetForm = () => {
@@ -387,7 +314,7 @@ export function RecordMahajanPaymentDialog({
             />
             {parseFloat(amount) > outstandingBalance && outstandingBalance > 0 && (
               <p className="text-sm text-yellow-600">
-                Overpayment of ₹{(parseFloat(amount) - outstandingBalance).toFixed(2)} will be recorded as advance
+                Overpayment of ₹{(parseFloat(amount) - outstandingBalance).toFixed(2)} will reflect in statement
               </p>
             )}
           </div>
