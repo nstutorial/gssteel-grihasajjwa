@@ -304,55 +304,79 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       }
     });
 
-    // Add each bill transaction as individual row
+    // Group bill transactions by REF# (same ref = same real transaction)
+    // Transactions without REF# are treated individually
+    const transactionsByRef = new Map<string, BillTransaction[]>();
+    let noRefCounter = 0;
+
     transactions.forEach(transaction => {
       const paymentDate = new Date(transaction.payment_date);
       const isInRange = (!startDate || paymentDate >= new Date(startDate)) && 
                        (!endDate || paymentDate <= new Date(endDate));
 
       if (isInRange) {
-        // Extract reference number from notes
-        let referenceNumber = '';
+        let refKey = '';
         if (transaction.notes) {
           const refMatch = transaction.notes.match(/REF#(\d{8})/);
           if (refMatch) {
-            referenceNumber = refMatch[1];
+            refKey = refMatch[1];
           }
         }
-
-        // Build description
-        let description = `Payment Received - ₹${transaction.amount.toFixed(2)} for ${transaction.bill.bill_number}`;
-        
-        // Extract partner info if present
-        if (transaction.notes && transaction.notes.includes('Payment from partner:')) {
-          const partnerMatch = transaction.notes.match(/Payment from partner: ([^-]+)/);
-          if (partnerMatch) {
-            description += ` from ${partnerMatch[1].trim()}`;
-          }
+        // No REF# means treat as individual transaction
+        if (!refKey) {
+          refKey = `__no_ref_${noRefCounter++}`;
         }
-
-        // Add clean notes
-        if (transaction.notes) {
-          let cleanNotes = transaction.notes;
-          cleanNotes = cleanNotes.replace(/Payment from partner:[^-]+-?/g, '').trim();
-          cleanNotes = cleanNotes.replace(/^[-\s]+|[-\s]+$/g, '').trim();
-          if (cleanNotes) {
-            description += ` - ${cleanNotes}`;
-          }
+        if (!transactionsByRef.has(refKey)) {
+          transactionsByRef.set(refKey, []);
         }
-
-        allEntries.push({
-          date: transaction.payment_date,
-          description,
-          reference: referenceNumber || 'N/A',
-          debit: 0,
-          credit: transaction.amount,
-          balance: 0,
-          type: 'payment_paid'
-        });
+        transactionsByRef.get(refKey)!.push(transaction);
       }
     });
 
+    // Create one row per real transaction
+    transactionsByRef.forEach((groupedTransactions, refKey) => {
+      const firstTransaction = groupedTransactions[0];
+      const totalAmount = groupedTransactions.reduce((sum, t) => sum + t.amount, 0);
+      const referenceNumber = refKey.startsWith('__no_ref_') ? 'N/A' : refKey;
+
+      // Build description listing each bill
+      let description = 'Payment Received';
+
+      // Extract partner info
+      if (firstTransaction.notes && firstTransaction.notes.includes('Payment from partner:')) {
+        const partnerMatch = firstTransaction.notes.match(/Payment from partner: ([^-]+)/);
+        if (partnerMatch) {
+          description += ` from ${partnerMatch[1].trim()}`;
+        }
+      }
+
+      // List bill-wise breakdown
+      const billDetails = groupedTransactions.map(t => {
+        return `₹${t.amount.toFixed(2)} for ${t.bill.bill_number}`;
+      }).join(', ');
+      description += ` (${billDetails})`;
+
+      // Add clean notes from first transaction
+      if (firstTransaction.notes) {
+        let cleanNotes = firstTransaction.notes;
+        cleanNotes = cleanNotes.replace(/Payment from partner:[^-]+-?/g, '').trim();
+        cleanNotes = cleanNotes.replace(/REF#\d{8}\s*-?\s*/g, '').trim();
+        cleanNotes = cleanNotes.replace(/^[-\s]+|[-\s]+$/g, '').trim();
+        if (cleanNotes) {
+          description += ` - ${cleanNotes}`;
+        }
+      }
+
+      allEntries.push({
+        date: firstTransaction.payment_date,
+        description,
+        reference: referenceNumber,
+        debit: 0,
+        credit: totalAmount,
+        balance: 0,
+        type: 'payment_paid'
+      });
+    });
     // Add firm transactions
     firmTransactions.forEach(firmTrans => {
       const transDate = new Date(firmTrans.transaction_date);
