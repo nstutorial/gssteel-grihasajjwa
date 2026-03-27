@@ -304,81 +304,53 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       }
     });
 
-    // Group transactions by date and payment mode
-    const transactionsByDate = new Map<string, BillTransaction[]>();
-    
+    // Add each bill transaction as individual row
     transactions.forEach(transaction => {
       const paymentDate = new Date(transaction.payment_date);
       const isInRange = (!startDate || paymentDate >= new Date(startDate)) && 
                        (!endDate || paymentDate <= new Date(endDate));
 
       if (isInRange) {
-        const key = `${transaction.payment_date}-${transaction.transaction_type}-${transaction.payment_mode}`;
-        if (!transactionsByDate.has(key)) {
-          transactionsByDate.set(key, []);
-        }
-        transactionsByDate.get(key)!.push(transaction);
-      }
-    });
-
-    // Create consolidated payment entries
-    transactionsByDate.forEach((groupedTransactions, key) => {
-      const firstTransaction = groupedTransactions[0];
-      const totalAmount = groupedTransactions.reduce((sum, t) => sum + t.amount, 0);
-      
-      // Extract reference number from notes
-      let referenceNumber = '';
-      if (firstTransaction.notes) {
-        const refMatch = firstTransaction.notes.match(/REF#(\d{8})/);
-        if (refMatch) {
-          referenceNumber = refMatch[1];
-        }
-      }
-      
-      // Build description with all bill details and notes
-      let description = `Payment Received`;
-      
-      // Extract partner info if present
-      let partnerInfo = '';
-      if (firstTransaction.notes && firstTransaction.notes.includes('Payment from partner:')) {
-        const partnerMatch = firstTransaction.notes.match(/Payment from partner: ([^-]+)/);
-        if (partnerMatch) {
-          partnerInfo = ` from ${partnerMatch[1].trim()}`;
-        }
-      }
-      
-      description += partnerInfo;
-      
-      // Add bill details with all notes from bill_transactions including REF#
-      const billDetails = groupedTransactions.map(t => {
-        let detail = `₹${t.amount.toFixed(2)} for ${t.bill.bill_number}`;
-        
-        // Extract and clean notes - remove only "Payment from partner:" but keep REF# and user notes
-        if (t.notes) {
-          let cleanNotes = t.notes;
-          // Remove "Payment from partner:" pattern
-          cleanNotes = cleanNotes.replace(/Payment from partner:[^-]+-?/g, '').trim();
-          // Remove leading/trailing dashes and spaces
-          cleanNotes = cleanNotes.replace(/^[-\s]+|[-\s]+$/g, '').trim();
-          
-          if (cleanNotes) {
-            detail += ` - ${cleanNotes}`;
+        // Extract reference number from notes
+        let referenceNumber = '';
+        if (transaction.notes) {
+          const refMatch = transaction.notes.match(/REF#(\d{8})/);
+          if (refMatch) {
+            referenceNumber = refMatch[1];
           }
         }
-        return detail;
-      }).join('\n');
-      
-      description += '\n' + billDetails;
 
-      allEntries.push({
-        date: firstTransaction.payment_date,
-        description: description,
-        reference: referenceNumber || 'N/A',
-        debit: 0,
-        credit: totalAmount,
-        balance: 0, // Will be calculated after sorting
-        type: 'payment_paid'
-      });
+        // Build description
+        let description = `Payment Received - ₹${transaction.amount.toFixed(2)} for ${transaction.bill.bill_number}`;
+        
+        // Extract partner info if present
+        if (transaction.notes && transaction.notes.includes('Payment from partner:')) {
+          const partnerMatch = transaction.notes.match(/Payment from partner: ([^-]+)/);
+          if (partnerMatch) {
+            description += ` from ${partnerMatch[1].trim()}`;
+          }
+        }
+
+        // Add clean notes
+        if (transaction.notes) {
+          let cleanNotes = transaction.notes;
+          cleanNotes = cleanNotes.replace(/Payment from partner:[^-]+-?/g, '').trim();
+          cleanNotes = cleanNotes.replace(/^[-\s]+|[-\s]+$/g, '').trim();
+          if (cleanNotes) {
+            description += ` - ${cleanNotes}`;
+          }
+        }
+
+        allEntries.push({
+          date: transaction.payment_date,
+          description,
+          reference: referenceNumber || 'N/A',
+          debit: 0,
+          credit: transaction.amount,
+          balance: 0,
+          type: 'payment_paid'
+        });
+      }
     });
 
     // Add firm transactions
