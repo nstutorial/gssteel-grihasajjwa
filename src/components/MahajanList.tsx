@@ -12,13 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight, Info, DollarSign } from 'lucide-react';
+import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useControl } from '@/contexts/ControlContext';
 import MahajanDetails from './MahajanDetails';
 import EditMahajanDialog from './EditMahajanDialog';
 import AddBillDialog from './AddBillDialog';
-import { AdvancePaymentDetailsDialog } from './AdvancePaymentDetailsDialog';
+
 import { RecordMahajanPaymentDialog } from './RecordMahajanPaymentDialog';
 
 interface Mahajan {
@@ -58,8 +58,6 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
   const [firmTransactions, setFirmTransactions] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [advanceDetailsOpen, setAdvanceDetailsOpen] = useState(false);
-  const [selectedMahajanForAdvance, setSelectedMahajanForAdvance] = useState<Mahajan | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedMahajanForPayment, setSelectedMahajanForPayment] = useState<Mahajan | null>(null);
 
