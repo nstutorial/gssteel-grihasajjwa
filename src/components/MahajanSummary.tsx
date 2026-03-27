@@ -29,7 +29,7 @@ interface MahajanSummaryData {
   last_payment_date?: string;
   avg_payment_amount: number;
   payment_frequency: number;
-  advance_payment: number;
+  
 }
 
 interface BillDetail {
@@ -111,7 +111,6 @@ const MahajanSummary: React.FC = () => {
           id,
           name,
           phone,
-          advance_payment,
           bills!inner(
             id,
             bill_amount,
@@ -170,7 +169,7 @@ const MahajanSummary: React.FC = () => {
           last_payment_date: lastPaymentDate,
           avg_payment_amount: avgPaymentAmount,
           payment_frequency: paymentFrequency,
-          advance_payment: Number(mahajan.advance_payment || 0),
+          
         };
       });
 
@@ -302,7 +301,7 @@ const MahajanSummary: React.FC = () => {
       'Total Bill Amount',
       'Total Paid Amount',
       'Outstanding Balance',
-      'Advance Payment',
+      
       'Last Payment Date',
       'Avg Payment Amount',
       'Payment Frequency'
@@ -316,7 +315,7 @@ const MahajanSummary: React.FC = () => {
       mahajan.total_bill_amount,
       mahajan.total_paid_amount,
       mahajan.outstanding_balance,
-      mahajan.advance_payment,
+      
       mahajan.last_payment_date ? formatDate(mahajan.last_payment_date) : '',
       mahajan.avg_payment_amount,
       mahajan.payment_frequency
@@ -489,7 +488,7 @@ const MahajanSummary: React.FC = () => {
                     <TableHead className="text-right">Bill Amount</TableHead>
                     <TableHead className="text-right">Paid Amount</TableHead>
                     <TableHead className="text-right">Outstanding</TableHead>
-                    <TableHead className="text-right">Advance Payment</TableHead>
+                    
                     <TableHead className="text-center">Last Payment</TableHead>
                     <TableHead className="text-center">Avg Payment</TableHead>
                     <TableHead className="text-center">Payments</TableHead>
@@ -529,11 +528,6 @@ const MahajanSummary: React.FC = () => {
                           <TableCell className="text-right">
                             <span className={mahajan.outstanding_balance > 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
                               {formatCurrency(mahajan.outstanding_balance)}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className="text-green-600 font-medium">
-                              {formatCurrency(mahajan.advance_payment)}
                             </span>
                           </TableCell>
                           <TableCell className="text-center">

@@ -12,13 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight, Info, DollarSign } from 'lucide-react';
+import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useControl } from '@/contexts/ControlContext';
 import MahajanDetails from './MahajanDetails';
 import EditMahajanDialog from './EditMahajanDialog';
 import AddBillDialog from './AddBillDialog';
-import { AdvancePaymentDetailsDialog } from './AdvancePaymentDetailsDialog';
+
 import { RecordMahajanPaymentDialog } from './RecordMahajanPaymentDialog';
 
 interface Mahajan {
@@ -58,8 +58,6 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
   const [firmTransactions, setFirmTransactions] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [advanceDetailsOpen, setAdvanceDetailsOpen] = useState(false);
-  const [selectedMahajanForAdvance, setSelectedMahajanForAdvance] = useState<Mahajan | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedMahajanForPayment, setSelectedMahajanForPayment] = useState<Mahajan | null>(null);
 
@@ -176,9 +174,7 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
       .filter(ft => ft.mahajan_id === mahajan.id)
       .reduce((sum, ft) => sum + Number(ft.amount), 0);
 
-    // Subtract both advance payment and firm payments from outstanding
-    const advancePayment = mahajan.advance_payment || 0;
-    return billsTotal - advancePayment - firmPayments;
+    return billsTotal - firmPayments;
   };
 
   const handleDeleteMahajan = async (mahajanId: string) => {
@@ -467,27 +463,6 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
                         </div>
                       </div>
 
-                      {mahajan.advance_payment && mahajan.advance_payment > 0 && (
-                        <div className="flex items-center justify-between pt-2 border-t border-dashed">
-                          <div className="text-sm">
-                            <div className="text-muted-foreground">Advance Payment</div>
-                            <div className="font-medium text-green-600">
-                              {formatCurrency(mahajan.advance_payment)}
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedMahajanForAdvance(mahajan);
-                              setAdvanceDetailsOpen(true);
-                            }}
-                            className="h-8 px-2"
-                          >
-                            <Info className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
                     </div>
 
                     <div className="flex gap-2 pt-2">
@@ -603,15 +578,6 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
         />
       )}
 
-      {/* Advance Payment Details Dialog */}
-      {advanceDetailsOpen && selectedMahajanForAdvance && (
-        <AdvancePaymentDetailsDialog
-          open={advanceDetailsOpen}
-          onOpenChange={setAdvanceDetailsOpen}
-          mahajanId={selectedMahajanForAdvance.id}
-          mahajanName={selectedMahajanForAdvance.name}
-        />
-      )}
 
       {/* Record Payment Dialog */}
       {paymentDialogOpen && selectedMahajanForPayment && (
