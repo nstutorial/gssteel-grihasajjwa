@@ -103,10 +103,10 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
   }, [user, mahajan.id]);
 
   useEffect(() => {
-    if (bills.length > 0 || firmTransactions.length > 0 || partnerTransactions.length > 0 || advancePaymentTransactions.length > 0) {
+    if (bills.length > 0 || firmTransactions.length > 0 || partnerTransactions.length > 0) {
       generateStatement();
     }
-  }, [bills, transactions, firmTransactions, partnerTransactions, advancePaymentTransactions, startDate, endDate]);
+  }, [bills, transactions, firmTransactions, partnerTransactions, startDate, endDate]);
 
   // Realtime subscriptions for partner transaction updates
   useEffect(() => {
