@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from './ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { extractReferenceFromNotes, getTransactionReference, normalizeReferenceSearchTerm } from '@/lib/transaction-reference';
+import { extractReferenceFromNotes, normalizeReferenceSearchTerm } from '@/lib/transaction-reference';
 
 interface Transaction {
   id: string;
@@ -22,39 +22,19 @@ interface Transaction {
   };
 }
 
-interface AdvanceTransaction {
-  id: string;
-  mahajan_id: string;
-  amount: number;
-  payment_date: string;
-  payment_mode: 'bank' | 'cash';
-  notes?: string;
-  type: 'advance';
-}
-
-type CombinedTransaction = (Transaction | AdvanceTransaction) & { source: 'bill' | 'advance' };
-
 interface SearchTransactionByIdProps {
   transactions: Transaction[];
-  advanceTransactions?: AdvanceTransaction[];
   onUpdate?: () => void;
 }
 
-const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdate }: SearchTransactionByIdProps) => {
+const SearchTransactionById = ({ transactions, onUpdate }: SearchTransactionByIdProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredTransactions, setFilteredTransactions] = useState<CombinedTransaction[]>([]);
-  const [editTransaction, setEditTransaction] = useState<CombinedTransaction | null>(null);
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+  const [editTransaction, setEditTransaction] = useState<Transaction | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Combine both transaction types
-  const allTransactions: CombinedTransaction[] = [
-    ...transactions.map(t => ({ ...t, source: 'bill' as const })),
-    ...advanceTransactions.map(t => ({ ...t, source: 'advance' as const }))
-  ];
-
-  // 🔍 Search by Reference Number (bill + advance)
   const handleSearch = () => {
     const term = normalizeReferenceSearchTerm(searchTerm);
 
@@ -64,18 +44,9 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
       return;
     }
 
-    const result = allTransactions.filter((t) => {
+    const result = transactions.filter((t) => {
       const noteReference = extractReferenceFromNotes(t.notes);
-      if (noteReference && noteReference.includes(term)) {
-        return true;
-      }
-
-      if (t.source === 'advance') {
-        const advanceReference = getTransactionReference(t as AdvanceTransaction);
-        return advanceReference.includes(term);
-      }
-
-      return false;
+      return noteReference && noteReference.includes(term);
     });
     
     if (result.length === 0) {
@@ -86,37 +57,22 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
     setCurrentPage(1);
   };
 
-  // 💾 Save edited transaction
   const handleSaveEdit = async () => {
     if (!editTransaction) return;
 
     try {
-      if (editTransaction.source === 'bill') {
-        const { error } = await supabase
-          .from('bill_transactions')
-          .update({
-            amount: editTransaction.amount,
-            transaction_type: (editTransaction as Transaction).transaction_type,
-            payment_date: editTransaction.payment_date,
-            payment_mode: editTransaction.payment_mode,
-            notes: editTransaction.notes,
-          })
-          .eq('id', editTransaction.id);
+      const { error } = await supabase
+        .from('bill_transactions')
+        .update({
+          amount: editTransaction.amount,
+          transaction_type: editTransaction.transaction_type,
+          payment_date: editTransaction.payment_date,
+          payment_mode: editTransaction.payment_mode,
+          notes: editTransaction.notes,
+        })
+        .eq('id', editTransaction.id);
 
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('advance_payment_transactions' as any)
-          .update({
-            amount: editTransaction.amount,
-            payment_date: editTransaction.payment_date,
-            payment_mode: editTransaction.payment_mode,
-            notes: editTransaction.notes,
-          })
-          .eq('id', editTransaction.id);
-
-        if (error) throw error;
-      }
+      if (error) throw error;
 
       setFilteredTransactions((prev) =>
         prev.map((t) => (t.id === editTransaction.id ? { ...editTransaction } : t))
@@ -124,35 +80,29 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
       setEditTransaction(null);
       toast.success('Transaction updated successfully');
 
-      // Notify other components and parent
       if (onUpdate) onUpdate();
       try {
         window.dispatchEvent(new Event('refresh-mahajans'));
       } catch {
-        // no-op in non-browser environments
+        // no-op
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to update transaction');
     }
   };
 
-  // ❌ Delete transaction
-  const handleDelete = async (transaction: CombinedTransaction) => {
+  const handleDelete = async (transaction: Transaction) => {
     const confirmDelete = window.confirm('Are you sure you want to delete this transaction?');
     if (!confirmDelete) return;
 
     try {
       setDeleteLoading(true);
-      
-      const tableName = transaction.source === 'bill' ? 'bill_transactions' : 'advance_payment_transactions';
-      const { error } = await supabase.from(tableName as any).delete().eq('id', transaction.id);
-      
+      const { error } = await supabase.from('bill_transactions').delete().eq('id', transaction.id);
       if (error) throw error;
 
       setFilteredTransactions((prev) => prev.filter((t) => t.id !== transaction.id));
       toast.success('Transaction deleted successfully');
 
-      // Trigger parent and global refresh
       if (onUpdate) onUpdate();
       try {
         window.dispatchEvent(new Event('refresh-mahajans'));
@@ -166,7 +116,6 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
     }
   };
 
-  // Pagination
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
@@ -179,7 +128,6 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
 
   return (
     <div className="space-y-6">
-      {/* 🔍 Search */}
       <div className="flex items-center space-x-2">
         <Input
           type="text"
@@ -187,7 +135,6 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-         
         />
         <Button onClick={handleSearch}>Search</Button>
         <Button variant="outline" onClick={handleReset}>
@@ -195,14 +142,11 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
         </Button>
       </div>
 
-      {/* 📋 Table */}
       {filteredTransactions.length > 0 ? (
         <>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Transaction ID</TableHead>
-                <TableHead>Source</TableHead>
                 <TableHead>Reference</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Transaction Type</TableHead>
@@ -214,22 +158,12 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
             </TableHeader>
             <TableBody>
               {paginatedTransactions.map((t) => (
-                <TableRow key={`${t.source}-${t.id}`}>
-                  <TableCell className="font-mono text-xs">{t.id.slice(0, 8)}...</TableCell>
-                  <TableCell>
-                    <span className={t.source === 'bill' ? 'text-blue-600' : 'text-green-600'}>
-                      {t.source === 'bill' ? 'Bill Payment' : 'Advance Payment'}
-                    </span>
-                  </TableCell>
+                <TableRow key={t.id}>
                   <TableCell className="font-mono text-xs">
-                    {t.source === 'advance'
-                      ? getTransactionReference(t as AdvanceTransaction)
-                      : extractReferenceFromNotes(t.notes) || '—'}
+                    {extractReferenceFromNotes(t.notes) || '—'}
                   </TableCell>
                   <TableCell>₹{t.amount.toFixed(2)}</TableCell>
-                  <TableCell>
-                    {t.source === 'bill' ? (t as Transaction).transaction_type : 'advance'}
-                  </TableCell>
+                  <TableCell>{t.transaction_type}</TableCell>
                   <TableCell>{t.payment_date}</TableCell>
                   <TableCell>{t.payment_mode}</TableCell>
                   <TableCell>{t.notes || '—'}</TableCell>
@@ -251,7 +185,6 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
             </TableBody>
           </Table>
 
-          {/* Pagination */}
           {filteredTransactions.length > itemsPerPage && (
             <div className="flex justify-between items-center pt-4">
               <Button
@@ -280,7 +213,6 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
         </p>
       )}
 
-      {/* ✏️ Edit Modal */}
       <Dialog open={!!editTransaction} onOpenChange={() => setEditTransaction(null)}>
         <DialogContent>
           <DialogHeader>
@@ -292,16 +224,6 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
 
           {editTransaction && (
             <div className="space-y-4">
-              <div>
-                <Label>Source</Label>
-                <Input
-                  type="text"
-                  value={editTransaction.source === 'bill' ? 'Bill Payment' : 'Advance Payment'}
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-
               <div>
                 <Label>Amount</Label>
                 <Input
@@ -316,25 +238,23 @@ const SearchTransactionById = ({ transactions, advanceTransactions = [], onUpdat
                 />
               </div>
 
-              {editTransaction.source === 'bill' && (
-                <div>
-                  <Label>Transaction Type</Label>
-                  <select
-                    className="border rounded-md px-2 py-1 w-full"
-                    value={(editTransaction as Transaction).transaction_type}
-                    onChange={(e) =>
-                      setEditTransaction({
-                        ...editTransaction,
-                        transaction_type: e.target.value as 'principal' | 'interest' | 'mixed',
-                      } as CombinedTransaction)
-                    }
-                  >
-                    <option value="principal">Principal</option>
-                    <option value="interest">Interest</option>
-                    <option value="mixed">Mixed</option>
-                  </select>
-                </div>
-              )}
+              <div>
+                <Label>Transaction Type</Label>
+                <select
+                  className="border rounded-md px-2 py-1 w-full"
+                  value={editTransaction.transaction_type}
+                  onChange={(e) =>
+                    setEditTransaction({
+                      ...editTransaction,
+                      transaction_type: e.target.value as 'principal' | 'interest' | 'mixed',
+                    })
+                  }
+                >
+                  <option value="principal">Principal</option>
+                  <option value="interest">Interest</option>
+                  <option value="mixed">Mixed</option>
+                </select>
+              </div>
 
               <div>
                 <Label>Payment Date</Label>
